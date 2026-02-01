@@ -19,13 +19,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "express": "^5.2.1",
+    "@fastify/express": "^4.0.4",
+    "@fastify/static": "^9.0.0",
+    "fastify": "^5.7.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

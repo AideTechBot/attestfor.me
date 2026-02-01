@@ -1,13 +1,17 @@
-import express from "express";
-import type { Request, Response } from "express";
+import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app = Fastify();
+const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.static(path.resolve("dist/client")));
+// Register static file serving for dist/client
+await app.register(fastifyStatic, {
+  root: path.resolve("dist/client"),
+  prefix: "/",
+});
 
 // Read manifest once (if available) so we can inject built CSS files into HTML
 let manifestData: Record<string, { css: string[] }> | null = null;
@@ -31,7 +35,8 @@ if (!fs.existsSync(clientIndexPath) || !fs.existsSync(serverEntryPath)) {
   process.exit(1);
 }
 
-app.get(/.*/, async (req: Request, res: Response) => {
+// Use Fastify's notFound handler for SSR fallback
+app.setNotFoundHandler(async (req, res) => {
   try {
     let template = fs.readFileSync(
       path.resolve("dist/client/index.html"),
@@ -59,7 +64,7 @@ app.get(/.*/, async (req: Request, res: Response) => {
     const { render } = mod as {
       render: (url?: string) => Promise<{ html: string; initState?: any }>;
     };
-    const { html, initState } = await render(req.originalUrl);
+    const { html, initState } = await render(req.raw.url);
 
     const htmlWithApp = template
       .replace("<!--app-html-->", html)
@@ -68,13 +73,12 @@ app.get(/.*/, async (req: Request, res: Response) => {
         `<script>window.__INITIAL_DATA__=${JSON.stringify(initState)}</script></body>`,
       );
 
-    res.status(200).send(htmlWithApp);
+    res.type("text/html").send(htmlWithApp);
   } catch (e) {
     console.error(e);
     res.status(500).send((e as Error).stack);
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Production SSR server running at http://localhost:${PORT}`);
-});
+await app.listen({ port: PORT });
+console.log(`Production SSR server running at http://localhost:${PORT}`);

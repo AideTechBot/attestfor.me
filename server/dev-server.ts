@@ -1,22 +1,23 @@
-import express from "express";
-import type { Request, Response } from "express";
+import Fastify from "fastify";
+import fastifyExpress from "@fastify/express";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { ViteDevServer } from "vite";
 
-const app = express();
+const app = Fastify();
 const PORT = Number(process.env.PORT) || 5173;
 
 const vite: ViteDevServer = await createViteServer({
-  server: { middlewareMode: true }, // Changed from "ssr" to true
+  server: { middlewareMode: true },
   appType: "custom",
 });
 
-// Vite's middleware is an express-compatible handler
+// Register Express middleware support for Vite
+await app.register(fastifyExpress);
 app.use(vite.middlewares);
 
-app.use(async (req: Request, res: Response) => {
+app.get("/*", async (req, res) => {
   try {
     let template = fs.readFileSync(path.resolve("index.html"), "utf-8");
     template = await vite.transformIndexHtml(
@@ -37,14 +38,13 @@ app.use(async (req: Request, res: Response) => {
         `<script>window.__INITIAL_DATA__=${JSON.stringify(initState)}</script></body>`,
       );
 
-    res.status(200).set({ "Content-Type": "text/html" }).end(htmlWithApp);
+    res.type("text/html").send(htmlWithApp);
   } catch (e) {
     vite.ssrFixStacktrace(e as Error);
     console.error(e);
-    res.status(500).end((e as Error).stack);
+    res.status(500).send((e as Error).stack);
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`dev SSR server running: http://localhost:${PORT}`);
-});
+await app.listen({ port: PORT });
+console.log(`dev SSR server running: http://localhost:${PORT}`);
