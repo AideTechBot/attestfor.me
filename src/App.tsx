@@ -6,7 +6,13 @@ function App() {
     <>
       <div>
         <a href="https://react.dev" target="_blank" rel="noopener noreferrer">
-          <img src={reactLogo} className="logo react" width="96" height="96" alt="React logo" />
+          <img
+            src={reactLogo}
+            className="logo react"
+            width="96"
+            height="96"
+            alt="React logo"
+          />
         </a>
       </div>
       <h1>ATtest for me!</h1>

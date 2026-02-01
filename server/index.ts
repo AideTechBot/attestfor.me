@@ -48,8 +48,7 @@ app.setNotFoundHandler(async (req, res) => {
       const cssFiles = new Set<string>();
       for (const key of Object.keys(manifestData)) {
         const entry = manifestData[key];
-        if (entry.css)
-          entry.css.forEach((c: string) => cssFiles.add(`/dist/client/${c}`));
+        if (entry.css) entry.css.forEach((c: string) => cssFiles.add(`/${c}`));
       }
       const cssLinks = Array.from(cssFiles)
         .map((href) => `<link rel="stylesheet" href="${href}" />`)
