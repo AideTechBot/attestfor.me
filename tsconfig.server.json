@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist/server", // Ensure output directory is set
+    "rootDir": "server",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": false,
+    "declaration": true // Force TypeScript to emit declaration files
+  },
+  "include": ["server/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

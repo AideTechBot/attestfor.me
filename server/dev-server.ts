@@ -1,24 +1,33 @@
 import express from "express";
+import type { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import type { ViteDevServer } from "vite";
 
 const app = express();
-const PORT = 5173;
+const PORT = Number(process.env.PORT) || 5173;
 
-const vite = await createViteServer({
-  server: { middlewareMode: "ssr" },
+const vite: ViteDevServer = await createViteServer({
+  server: { middlewareMode: true }, // Changed from "ssr" to true
   appType: "custom",
 });
 
+// Vite's middleware is an express-compatible handler
 app.use(vite.middlewares);
 
-app.use(async (req, res) => {
+app.use(async (req: Request, res: Response) => {
   try {
     let template = fs.readFileSync(path.resolve("index.html"), "utf-8");
-    template = await vite.transformIndexHtml(req.originalUrl, template);
+    template = await vite.transformIndexHtml(
+      req.originalUrl ?? req.url,
+      template,
+    );
 
-    const { render } = await vite.ssrLoadModule("/src/entry-server.tsx");
+    const mod = await vite.ssrLoadModule("/src/entry-server.tsx");
+    const { render } = mod as {
+      render: (url?: string) => Promise<{ html: string; initState?: any }>;
+    };
     const { html, initState } = await render(req.originalUrl);
 
     const htmlWithApp = template
@@ -30,9 +39,9 @@ app.use(async (req, res) => {
 
     res.status(200).set({ "Content-Type": "text/html" }).end(htmlWithApp);
   } catch (e) {
-    vite.ssrFixStacktrace(e);
+    vite.ssrFixStacktrace(e as Error);
     console.error(e);
-    res.status(500).end(e.stack);
+    res.status(500).end((e as Error).stack);
   }
 });
 

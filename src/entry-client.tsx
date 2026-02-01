@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-const initial = (window as any).__INITIAL_DATA__ || {};
+const initial = window.__INITIAL_DATA__ || {};
 void initial; // reference to avoid unused variable error; pass to App if needed
 // You can pass `initial` to your app via context or props if needed
 hydrateRoot(document.getElementById("root")!, <App />);
