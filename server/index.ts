@@ -17,7 +17,7 @@ await app.register(fastifyStatic, {
 let manifestData: Record<string, { css: string[] }> | null = null;
 try {
   const manifestRaw = fs.readFileSync(
-    path.resolve("dist/client/manifest.json"),
+    path.resolve("dist/client/.vite/manifest.json"),
     "utf-8",
   );
   manifestData = JSON.parse(manifestRaw);

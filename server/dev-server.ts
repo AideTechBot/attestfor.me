@@ -6,7 +6,7 @@ import { createServer as createViteServer } from "vite";
 import type { ViteDevServer } from "vite";
 
 const app = Fastify();
-const PORT = Number(process.env.PORT) || 5173;
+const PORT = Number(process.env.PORT) || 3000;
 
 const vite: ViteDevServer = await createViteServer({
   server: { middlewareMode: true },
@@ -24,6 +24,41 @@ app.get("/*", async (req, res) => {
       req.originalUrl ?? req.url,
       template,
     );
+
+    // In dev mode, use Vite's module graph to discover CSS dependencies
+    const entryModule = await vite.moduleGraph.getModuleByUrl(
+      "/src/entry-client.tsx",
+    );
+    const cssUrls = new Set<string>();
+
+    if (entryModule) {
+      const visited = new Set<string>();
+      const collectCss = async (mod: typeof entryModule) => {
+        if (!mod || visited.has(mod.url)) return;
+        visited.add(mod.url);
+
+        if (mod.url.endsWith(".css")) {
+          cssUrls.add(mod.url);
+        }
+
+        // Recursively check imported modules
+        if (mod.importedModules) {
+          for (const imported of mod.importedModules) {
+            await collectCss(imported);
+          }
+        }
+      };
+
+      await collectCss(entryModule);
+    }
+
+    // Inject CSS links into head
+    const cssLinks = Array.from(cssUrls)
+      .map((url) => `<link rel="stylesheet" href="${url}" />`)
+      .join("\n");
+    if (cssLinks) {
+      template = template.replace("</head>", `${cssLinks}\n</head>`);
+    }
 
     const mod = await vite.ssrLoadModule("/src/entry-server.tsx");
     const { render } = mod as {
