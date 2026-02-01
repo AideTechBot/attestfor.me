@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { ViteDevServer } from "vite";
+import type { InitialState } from "../src/types";
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;
@@ -62,7 +63,9 @@ app.get("/*", async (req, res) => {
 
     const mod = await vite.ssrLoadModule("/src/entry-server.tsx");
     const { render } = mod as {
-      render: (url?: string) => Promise<{ html: string; initState?: any }>;
+      render: (
+        url?: string,
+      ) => Promise<{ html: string; initState: InitialState }>;
     };
     const { html, initState } = await render(req.originalUrl);
 
@@ -70,7 +73,7 @@ app.get("/*", async (req, res) => {
       .replace("<!--app-html-->", html)
       .replace(
         "</body>",
-        `<script>window.__INITIAL_DATA__=${JSON.stringify(initState)}</script></body>`,
+        `<script>window.__INITIAL_STATE__=${JSON.stringify(initState)}</script></body>`,
       );
 
     res.type("text/html").send(htmlWithApp);

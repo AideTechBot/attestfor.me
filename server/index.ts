@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
+import type { InitialState } from "../src/types";
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;
@@ -61,7 +62,9 @@ app.setNotFoundHandler(async (req, res) => {
     ).href;
     const mod = await import(serverEntryURL);
     const { render } = mod as {
-      render: (url?: string) => Promise<{ html: string; initState?: any }>;
+      render: (
+        url?: string,
+      ) => Promise<{ html: string; initState: InitialState }>;
     };
     const { html, initState } = await render(req.raw.url);
 
@@ -69,7 +72,7 @@ app.setNotFoundHandler(async (req, res) => {
       .replace("<!--app-html-->", html)
       .replace(
         "</body>",
-        `<script>window.__INITIAL_DATA__=${JSON.stringify(initState)}</script></body>`,
+        `<script>window.__INITIAL_STATE__=${JSON.stringify(initState)}</script></body>`,
       );
 
     res.type("text/html").send(htmlWithApp);
