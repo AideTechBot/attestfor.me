@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build outputs (rebuilt in container)
+dist/
+
+# Git
+.git/
+.gitignore
+
+# Docker files
+docker-compose.yml
+Dockerfile
+.dockerignore
+nginx.conf
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Documentation
+README.md
+LICENSE
+
+# Logs
+*.log
+pnpm-debug.log*

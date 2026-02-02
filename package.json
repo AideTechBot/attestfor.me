@@ -13,7 +13,6 @@
     "build:server:ts": "tsc -p tsconfig.server.json",
     "build:server": "vite build --ssr src/entry-server.tsx --outDir dist/server && pnpm run build:server:ts",
     "build": "tsc -b && pnpm run build:client && pnpm run build:server",
-    "prestart": "pnpm run build",
     "start": "node dist/server/index.js",
     "lint": "eslint .",
     "preview": "vite preview",
