@@ -1,35 +1,93 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { User, ExternalLink, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface PageLayoutProps {
   children: ReactNode;
 }
 
+// TODO: Replace with actual auth state
+const IS_LOGGED_IN = true;
+
 export function PageLayout({ children }: PageLayoutProps) {
+  const [searchValue, setSearchValue] = useState("");
+
   return (
-    <div className="w-[400px] max-w-full min-h-screen mx-auto px-6 py-8 flex flex-col">
+    <div className="w-full max-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header with User Icon and Search */}
       <header className="flex items-center gap-3 mb-3">
-        <div className="w-8 h-8 min-h-8 bg-surface border border-surface-border box-border flex items-center justify-center text-muted text-xs shrink-0 leading-none">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={cn(
+              "w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
+              "flex items-center justify-center text-muted text-xs shrink-0 leading-none",
+              "hover:border-accent transition-colors cursor-pointer outline-none",
+              "data-[state=open]:border-accent",
+            )}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-            />
-          </svg>
+            <User className="w-5 h-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={4}
+            className="bg-surface border-surface-border shadow-lg p-0 min-w-32 rounded-none text-inherit"
+          >
+            {!IS_LOGGED_IN ? (
+              <DropdownMenuItem
+                className="px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
+                onSelect={() => {
+                  // TODO: Implement sign in
+                }}
+              >
+                Sign in
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  className="whitespace-nowrap px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
+                  onSelect={() => {
+                    // TODO: Navigate to profile
+                  }}
+                >
+                  <span>Visit profile</span>
+                  <ExternalLink className="w-4 h-4 ml-auto" />
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
+                  onSelect={() => {
+                    // TODO: Implement sign out
+                  }}
+                >
+                  Sign out
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="flex-1 relative">
+          <Input
+            type="text"
+            placeholder="Search..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            className="pr-8"
+          />
+          {searchValue && (
+            <button
+              onClick={() => setSearchValue("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          placeholder="Search..."
-          className="flex-1 h-8 min-h-8 px-3 border border-surface-border box-border bg-input text-inherit outline-none text-sm placeholder:text-muted leading-none"
-        />
       </header>
 
       {/* Main Content */}
