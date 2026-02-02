@@ -9,7 +9,7 @@ export function PageLayout({ children }: PageLayoutProps) {
     <div className="w-[400px] max-w-full min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header with User Icon and Search */}
       <header className="flex items-center gap-3 mb-3">
-        <div className="w-8 h-8 bg-surface border border-surface-border box-border flex items-center justify-center text-muted text-xs shrink-0">
+        <div className="w-8 h-8 min-h-8 bg-surface border border-surface-border box-border flex items-center justify-center text-muted text-xs shrink-0 leading-none">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="w-5 h-5"
@@ -28,7 +28,7 @@ export function PageLayout({ children }: PageLayoutProps) {
         <input
           type="text"
           placeholder="Search..."
-          className="flex-1 h-8 px-3 border border-surface-border box-border bg-input text-inherit outline-none text-sm placeholder:text-muted"
+          className="flex-1 h-8 min-h-8 px-3 border border-surface-border box-border bg-input text-inherit outline-none text-sm placeholder:text-muted leading-none"
         />
       </header>
 
