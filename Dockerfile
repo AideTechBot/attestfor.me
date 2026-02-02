@@ -28,7 +28,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy package files and install production dependencies only
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
