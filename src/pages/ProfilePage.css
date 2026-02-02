@@ -1,0 +1,52 @@
+.profile-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.profile-header {
+  margin-bottom: 3rem;
+}
+
+.profile-back-link {
+  color: #646cff;
+  text-decoration: none;
+  font-size: 1rem;
+}
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.profile-picture {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: white;
+  font-weight: bold;
+}
+
+.profile-info {
+  text-align: center;
+  max-width: 600px;
+}
+
+.profile-name {
+  font-size: 2.5rem;
+  margin: 0 0 1rem 0;
+}
+
+.profile-description {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #bbb;
+  margin: 0;
+}

@@ -1,27 +1,12 @@
 import { Link } from "react-router";
+import "./NotFoundPage.css";
 
 export function NotFoundPage() {
   return (
-    <div
-      style={{
-        maxWidth: "600px",
-        margin: "4rem auto",
-        padding: "2rem",
-        textAlign: "center",
-      }}
-    >
-      <h1 style={{ fontSize: "4rem", marginBottom: "1rem" }}>404</h1>
-      <p style={{ fontSize: "1.5rem", marginBottom: "2rem", color: "#888" }}>
-        Page not found
-      </p>
-      <Link
-        to="/"
-        style={{
-          color: "#646cff",
-          textDecoration: "none",
-          fontSize: "1.2rem",
-        }}
-      >
+    <div className="not-found-page">
+      <h1 className="not-found-title">404</h1>
+      <p className="not-found-message">Page not found</p>
+      <Link to="/" className="not-found-link">
         ← Back to Home
       </Link>
     </div>

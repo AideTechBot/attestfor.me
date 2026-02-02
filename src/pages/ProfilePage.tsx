@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useParams } from "react-router";
 import { NotFoundPage } from "./NotFoundPage";
+import "./ProfilePage.css";
 
 const VALID_IDS = ["john"];
 
@@ -20,59 +21,23 @@ export function ProfilePage() {
   }
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
+    <div className="profile-page">
       {/* Header with Back Link */}
-      <header style={{ marginBottom: "3rem" }}>
-        <Link
-          to="/"
-          style={{
-            color: "#646cff",
-            textDecoration: "none",
-            fontSize: "1rem",
-          }}
-        >
+      <header className="profile-header">
+        <Link to="/" className="profile-back-link">
           ← Back to Home
         </Link>
       </header>
 
       {/* Profile Section */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "2rem",
-        }}
-      >
+      <div className="profile-section">
         {/* Profile Picture */}
-        <div
-          style={{
-            width: "150px",
-            height: "150px",
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "3rem",
-            color: "white",
-            fontWeight: "bold",
-          }}
-        >
-          {id?.[0].toUpperCase()}
-        </div>
+        <div className="profile-picture">{id?.[0].toUpperCase()}</div>
 
         {/* Profile Info */}
-        <div style={{ textAlign: "center", maxWidth: "600px" }}>
-          <h1 style={{ fontSize: "2.5rem", margin: "0 0 1rem 0" }}>{id}</h1>
-          <p
-            style={{
-              fontSize: "1.1rem",
-              lineHeight: "1.6",
-              color: "#bbb",
-              margin: 0,
-            }}
-          >
+        <div className="profile-info">
+          <h1 className="profile-name">{id}</h1>
+          <p className="profile-description">
             This is the profile description for {id}. Here you can add
             information about this user, their interests, achievements, and
             anything else you'd like to share.
