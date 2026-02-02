@@ -1,15 +1,12 @@
 import { hydrateRoot } from "react-dom/client";
-import App from "./App";
-import "./index.css";
-import type { InitialState } from "./types";
+import { createBrowserRouter, RouterProvider } from "react-router";
+import { routes } from "./routes";
 
-declare global {
-  interface Window {
-    __INITIAL_STATE__?: InitialState;
-  }
+const router = createBrowserRouter(routes);
+
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
 }
 
-const initial = window.__INITIAL_STATE__ || {};
-void initial; // reference to avoid unused variable error; pass to App if needed
-// You can pass `initial` to your app via context or props if needed
-hydrateRoot(document.getElementById("root")!, <App />);
+hydrateRoot(rootElement, <RouterProvider router={router} />);

@@ -4,7 +4,6 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { ViteDevServer } from "vite";
-import type { InitialState } from "../src/types";
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,19 +62,40 @@ app.get("/*", async (req, res) => {
 
     const mod = await vite.ssrLoadModule("/src/entry-server.tsx");
     const { render } = mod as {
-      render: (
-        url?: string,
-      ) => Promise<{ html: string; initState: InitialState }>;
+      render: (request: Request) => Promise<{
+        html: string;
+        notFound: boolean;
+        redirect?: Response;
+      }>;
     };
-    const { html, initState } = await render(req.originalUrl);
 
-    const htmlWithApp = template
-      .replace("<!--app-html-->", html)
-      .replace(
-        "</body>",
-        `<script>window.__INITIAL_STATE__=${JSON.stringify(initState)}</script></body>`,
-      );
+    // Create a Fetch Request from the incoming request
+    const url = new URL(
+      req.originalUrl ?? req.url,
+      `http://${req.headers.host}`,
+    );
+    const fetchRequest = new Request(url.href, {
+      method: req.method,
+      headers: new Headers(req.headers as Record<string, string>),
+    });
 
+    const result = await render(fetchRequest);
+
+    // Handle redirects
+    if (result.redirect) {
+      const location = result.redirect.headers.get("Location");
+      if (location) {
+        res.status(result.redirect.status).redirect(location);
+        return;
+      }
+    }
+
+    const { html, notFound } = result;
+    const htmlWithApp = template.replace("<!--app-html-->", html);
+
+    if (notFound) {
+      res.status(404);
+    }
     res.type("text/html").send(htmlWithApp);
   } catch (e) {
     vite.ssrFixStacktrace(e as Error);

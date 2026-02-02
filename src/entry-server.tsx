@@ -1,13 +1,37 @@
 import { renderToString } from "react-dom/server";
-import App from "./App";
-import type { InitialState } from "./types";
+import {
+  createStaticHandler,
+  createStaticRouter,
+  StaticRouterProvider,
+} from "react-router";
+import { routes } from "./routes";
 
-export async function render(
-  _url?: string,
-): Promise<{ html: string; initState: InitialState }> {
-  // Example server-side data fetching could go here based on the `_url`.
-  void _url; // reference to avoid unused parameter error
-  const appHtml = renderToString(<App />);
-  const initState: InitialState = {}; // fill with server-provided initial state as needed
-  return { html: appHtml, initState };
+// Create static handler once
+const handler = createStaticHandler(routes);
+
+export async function render(request: Request) {
+  const context = await handler.query(request);
+
+  // Handle redirects
+  if (context instanceof Response) {
+    return { redirect: context };
+  }
+
+  const router = createStaticRouter(handler.dataRoutes, context);
+  const html = renderToString(
+    <StaticRouterProvider router={router} context={context} />,
+  );
+
+  // Check if this is a 404 page
+  const isNotFound =
+    context.matches.length === 0 ||
+    context.matches.some((m) => m.route.path === "*") ||
+    context.matches.some((m) => {
+      const data = context.loaderData?.[m.route.id] as
+        | { isValid?: boolean }
+        | undefined;
+      return data?.isValid === false;
+    });
+
+  return { html, notFound: isNotFound };
 }
