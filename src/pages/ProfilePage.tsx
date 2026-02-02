@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useParams } from "react-router";
-import { NotFoundPage } from "./NotFoundPage";
-import "./ProfilePage.css";
+import { NotFoundContent } from "./NotFoundPage";
 
 const VALID_IDS = ["john"];
 
@@ -17,27 +16,36 @@ export function ProfilePage() {
   const { isValid } = useLoaderData() as { isValid: boolean };
 
   if (!isValid) {
-    return <NotFoundPage />;
+    return (
+      <div className="w-[400px] max-w-full min-h-screen mx-auto px-6 py-8 flex flex-col">
+        <NotFoundContent />
+      </div>
+    );
   }
 
   return (
-    <div className="profile-page">
+    <div className="w-[400px] max-w-full min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header with Back Link */}
-      <header className="profile-header">
-        <Link to="/" className="profile-back-link">
+      <header className="flex justify-between items-center mb-8">
+        <Link
+          to="/"
+          className="text-accent hover:text-accent-hover transition-colors"
+        >
           ← Back to Home
         </Link>
       </header>
 
       {/* Profile Section */}
-      <div className="profile-section">
+      <div className="flex-1 flex flex-col items-center justify-center gap-6">
         {/* Profile Picture */}
-        <div className="profile-picture">{id?.[0].toUpperCase()}</div>
+        <div className="w-30 h-30 bg-accent flex items-center justify-center text-4xl text-white font-bold shadow-lg shadow-accent-subtle">
+          {id?.[0].toUpperCase()}
+        </div>
 
         {/* Profile Info */}
-        <div className="profile-info">
-          <h1 className="profile-name">{id}</h1>
-          <p className="profile-description">
+        <div className="text-center">
+          <h1 className="text-2xl m-0 mb-3">{id}</h1>
+          <p className="text-sm leading-relaxed text-muted m-0">
             This is the profile description for {id}. Here you can add
             information about this user, their interests, achievements, and
             anything else you'd like to share.

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* Theme configuration */
+@theme {
+  /* Accent colors - references CSS variables */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+
+  /* Surface colors */
+  --color-surface: var(--surface);
+  --color-surface-border: var(--surface-border);
+  --color-input: var(--input);
+
+  /* Text colors */
+  --color-muted: var(--muted);
+
+  /* Background */
+  --color-page: var(--page);
+
+  /* Shadows */
+  --shadow-page: var(--shadow-page-value);
+}
+
+/* Dark mode (default) */
+:root {
+  --accent: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-subtle: rgba(96, 165, 250, 0.12);
+
+  --surface: #1a1a1a;
+  --surface-border: #2a2a2a;
+  --input: #141414;
+
+  --muted: #888888;
+  --page: #121212;
+
+  --shadow-page-value: 0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Light mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-subtle: rgba(37, 99, 235, 0.08);
+
+    --surface: #ffffff;
+    --surface-border: #e5e5e0;
+    --input: #fafaf8;
+
+    --muted: #666666;
+    --page: #f5f5f0;
+
+    --shadow-page-value: 0 0 40px rgba(0, 0, 0, 0.06);
+  }
+}
