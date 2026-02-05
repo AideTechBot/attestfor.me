@@ -20,7 +20,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   const [searchValue, setSearchValue] = useState("");
 
   return (
-    <div className="w-full max-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
+    <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header with User Icon and Search */}
       <header className="flex items-center gap-3 mb-3">
         <DropdownMenu>
