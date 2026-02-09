@@ -1,10 +1,8 @@
+import type { OAuthClientMetadata } from "@atproto/oauth-client-node";
 import { NodeOAuthClient } from "@atproto/oauth-client-node";
 import { JoseKey } from "@atproto/jwk-jose";
 import { store } from "./storage";
-
-const APP_URL = process.env.APP_URL || "https://example.com";
-
-const METADATA_URL = `${APP_URL}/oauth/client-metadata.json`;
+import clientMetadataJson from "../public/oauth/client-metadata.json";
 
 interface SessionData {
   did: string;
@@ -33,21 +31,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
 }
 
 const privateKey = await JoseKey.generate();
+const clientMetadata = clientMetadataJson as unknown as OAuthClientMetadata;
 
-// Create OAuth client
 export const oauthClient = new NodeOAuthClient({
-  clientMetadata: {
-    client_id: METADATA_URL,
-    client_name: "ATtestfor.me",
-    client_uri: APP_URL,
-    redirect_uris: [`${APP_URL}/api/auth/callback`],
-    scope: "atproto transition:generic",
-    grant_types: ["authorization_code", "refresh_token"],
-    response_types: ["code"],
-    application_type: "web",
-    token_endpoint_auth_method: "none",
-    dpop_bound_access_tokens: true,
-  },
+  clientMetadata,
   keyset: [privateKey],
   handleResolver: "https://bsky.social",
   stateStore: {
