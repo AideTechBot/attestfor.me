@@ -9,6 +9,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "./ui/input";
 import { cn } from "@/lib/utils";
+import {
+  getRecentSearches,
+  addRecentSearch,
+  clearRecentSearches,
+  removeRecentSearch,
+} from "@/lib/recent-searches";
+import { SearchPopup } from "./SearchPopup";
+import { useBlueskySearch } from "@/lib/use-bluesky-search";
+import { useRandomFollowers } from "@/lib/use-random-followers";
 import "./search-animated.css";
 
 interface PageLayoutProps {
@@ -41,8 +50,18 @@ export function PageLayout({ children }: PageLayoutProps) {
   const [loginHandle, setLoginHandle] = useState("");
   const [showLoginInput, setShowLoginInput] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [session, setSession] = useState<SessionData>({ authenticated: false });
   const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  const { results: suggestions, loading: suggestionsLoading } = useBlueskySearch(
+    searchValue,
+    searchFocused,
+  );
+
+  const followSuggestions = useRandomFollowers(
+    session.authenticated ? session.handle : undefined,
+  );
 
   const inputRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLSpanElement>(null);
@@ -121,9 +140,30 @@ export function PageLayout({ children }: PageLayoutProps) {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchValue.trim()) {return;}
-    const handle = searchValue.startsWith("@") ? searchValue : `@${searchValue}`;
-    navigate(`/${handle}`);
+    const clean = searchValue.startsWith("@") ? searchValue.slice(1) : searchValue;
+    addRecentSearch(clean);
+    setRecentSearches(getRecentSearches());
+    navigate(`/@${clean}`);
     setSearchValue("");
+    inputRef.current?.blur();
+  };
+
+  const handleSearchSelect = (handle: string) => {
+    addRecentSearch(handle);
+    setRecentSearches(getRecentSearches());
+    navigate(`/@${handle}`);
+    setSearchValue("");
+    inputRef.current?.blur();
+  };
+
+  const handleRemoveRecent = (handle: string) => {
+    removeRecentSearch(handle);
+    setRecentSearches(getRecentSearches());
+  };
+
+  const handleClearAllRecent = () => {
+    clearRecentSearches();
+    setRecentSearches([]);
   };
 
   const clearSearch = () => {
@@ -174,7 +214,10 @@ export function PageLayout({ children }: PageLayoutProps) {
               placeholder="Search..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
+              onFocus={() => {
+                setSearchFocused(true);
+                setRecentSearches(getRecentSearches());
+              }}
               onBlur={() => setSearchFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -194,6 +237,17 @@ export function PageLayout({ children }: PageLayoutProps) {
                 <X className="w-4 h-4" />
               </button>
             )}
+            <SearchPopup
+              visible={searchFocused}
+              searchValue={searchValue}
+              recentSearches={recentSearches}
+              suggestions={suggestions}
+              suggestionsLoading={suggestionsLoading}
+              followSuggestions={followSuggestions}
+              onSelect={handleSearchSelect}
+              onRemove={handleRemoveRecent}
+              onClearAll={handleClearAllRecent}
+            />
           </div>
         </form>
 
