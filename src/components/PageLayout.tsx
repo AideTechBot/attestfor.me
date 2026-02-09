@@ -21,11 +21,14 @@ interface SessionData {
   avatar?: string;
 }
 
+import { useLocation } from "react-router";
+
 export function PageLayout({ children }: PageLayoutProps) {
   const [searchValue, setSearchValue] = useState("");
   const [loginHandle, setLoginHandle] = useState("");
   const [showLoginInput, setShowLoginInput] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Start with no session to match SSR
   const [session, setSession] = useState<SessionData>({ authenticated: false });
@@ -63,6 +66,34 @@ export function PageLayout({ children }: PageLayoutProps) {
     <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header with User Icon and Search */}
       <header className="flex items-center gap-3 mb-3">
+        {/* Show logo only if not on homepage */}
+        {location.pathname !== "/" && location.pathname !== "/home" && (
+          <a
+            href="/"
+            className="font-bold text-lg text-accent mr-2 whitespace-nowrap"
+            aria-label="Go to homepage"
+          >
+            attestfor.me
+          </a>
+        )}
+        <form onSubmit={handleSearch} className="flex-1 relative">
+          <Input
+            type="text"
+            placeholder="Search..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            className="pr-8"
+          />
+          {searchValue && (
+            <button
+              type="button"
+              onClick={() => setSearchValue("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </form>
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
@@ -83,7 +114,8 @@ export function PageLayout({ children }: PageLayoutProps) {
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            align="start"
+            align="end"
+            side="bottom"
             sideOffset={4}
             className="bg-surface border-surface-border shadow-lg p-0 min-w-32 rounded-none text-inherit"
           >
@@ -121,15 +153,18 @@ export function PageLayout({ children }: PageLayoutProps) {
               </div>
             ) : (
               <>
-                <DropdownMenuItem
-                  className="whitespace-nowrap px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
-                  onSelect={() => {
-                    navigate(`/@${session.handle}`);
-                  }}
-                >
-                  <span>Visit profile</span>
-                  <ExternalLink className="w-4 h-4 ml-auto" />
-                </DropdownMenuItem>
+                {/* Hide 'Visit profile' if already on own profile */}
+                {!(location.pathname === `/@${session.handle}`) && (
+                  <DropdownMenuItem
+                    className="whitespace-nowrap px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
+                    onSelect={() => {
+                      navigate(`/@${session.handle}`);
+                    }}
+                  >
+                    <span>Visit profile</span>
+                    <ExternalLink className="w-4 h-4 ml-auto" />
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white"
                   onSelect={handleLogout}
@@ -140,24 +175,6 @@ export function PageLayout({ children }: PageLayoutProps) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <form onSubmit={handleSearch} className="flex-1 relative">
-          <Input
-            type="text"
-            placeholder="Search..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            className="pr-8"
-          />
-          {searchValue && (
-            <button
-              type="button"
-              onClick={() => setSearchValue("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </form>
       </header>
 
       {/* Main Content */}
