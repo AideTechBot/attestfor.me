@@ -1,5 +1,7 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import fastifyExpress from "@fastify/express";
+import { setupApp } from "./app-setup";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -7,6 +9,8 @@ import type { ViteDevServer } from "vite";
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;
+// Register shared OAuth/session routes
+await setupApp(app);
 
 const vite: ViteDevServer = await createViteServer({
   server: { middlewareMode: true },
@@ -104,5 +108,7 @@ app.get("/*", async (req, res) => {
   }
 });
 
-await app.listen({ port: PORT });
-console.log(`dev SSR server running: http://localhost:${PORT}`);
+await app.listen({ port: PORT, host: "0.0.0.0" });
+console.log(
+  `dev SSR server running: http://localhost:${PORT} (or your tunnel URL)`,
+);

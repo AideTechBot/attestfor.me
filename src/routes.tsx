@@ -10,7 +10,7 @@ export const routes: RouteObject[] = [
     element: <HomePage />,
   },
   {
-    path: "/:id",
+    path: "/:handle",
     element: <ProfilePage />,
     loader: profileLoader,
   },

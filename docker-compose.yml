@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Your production domain
+      - APP_URL=https://attestfor.me
+      # Generate a secure random secret: openssl rand -hex 32
+      - COOKIE_SECRET=${COOKIE_SECRET}
+      # Redis connection
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
