@@ -1,4 +1,4 @@
-const MAX_RECENT = 10;
+const MAX_RECENT = 3;
 const STORAGE_KEY = "attestforme-recent-searches";
 
 export function getRecentSearches(): string[] {
