@@ -69,6 +69,15 @@ export function PageLayout({ children }: PageLayoutProps) {
       });
   }, []);
 
+  // If the user focused the input before hydration, React misses the focus event.
+  // Sync state with the actual DOM focus on mount.
+  useEffect(() => {
+    if (inputRef.current && document.activeElement === inputRef.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSearchFocused(true);
+    }
+  }, []);
+
   // Measure logo/avatar widths and set CSS custom properties on the header
   useEffect(() => {
     const header = headerRef.current;
@@ -167,11 +176,18 @@ export function PageLayout({ children }: PageLayoutProps) {
               onChange={(e) => setSearchValue(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchValue("");
+                  inputRef.current?.blur();
+                }
+              }}
               className={cn("pr-8 w-full h-full search-input", searchFocused && "search-active")}
             />
             {searchValue && (
               <button
                 type="button"
+                onMouseDown={(e) => { e.preventDefault(); }}
                 onClick={clearSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
               >
