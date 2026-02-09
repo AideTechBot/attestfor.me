@@ -26,6 +26,11 @@ export async function profileLoader({
   const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
   console.log("[ProfileLoader] Clean handle:", cleanHandle);
 
+  // Skip requests for static files that hit the /:handle route (e.g. favicon.ico)
+  if (/\.(ico|png|jpg|jpeg|svg|webp|gif|js|css|map|json|txt|xml|webmanifest)$/i.test(cleanHandle)) {
+    return { handle: cleanHandle, isValid: false };
+  }
+
   try {
     // Fetch profile from Bluesky API
     const url = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${cleanHandle}`;

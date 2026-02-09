@@ -29,6 +29,9 @@ app.get("/*", async (req, res) => {
       template,
     );
 
+    // Use dev favicon in development
+    template = template.replace("/favicon.svg", "/favicon-dev.svg");
+
     // In dev mode, use Vite's module graph to discover CSS dependencies
     const entryModule = await vite.moduleGraph.getModuleByUrl(
       "/src/entry-client.tsx",
@@ -38,7 +41,9 @@ app.get("/*", async (req, res) => {
     if (entryModule) {
       const visited = new Set<string>();
       const collectCss = async (mod: typeof entryModule) => {
-        if (!mod || visited.has(mod.url)) {return;}
+        if (!mod || visited.has(mod.url)) {
+          return;
+        }
         visited.add(mod.url);
 
         if (mod.url.endsWith(".css")) {
