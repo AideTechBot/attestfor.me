@@ -11,7 +11,7 @@ class InMemoryStore implements Store {
 
   async get(key: string): Promise<string | null> {
     const entry = this.data.get(key);
-    if (!entry) return null;
+    if (!entry) {return null;}
 
     // Check if expired
     if (entry.expiry && Date.now() > entry.expiry) {

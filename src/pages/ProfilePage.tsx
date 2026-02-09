@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { NotFoundContent } from "./NotFoundPage";
-import { PageLayout } from "../components/PageLayout";
 
 interface ProfileData {
   handle: string;
@@ -63,15 +62,11 @@ export function ProfilePage() {
   const profile = useLoaderData() as ProfileData;
 
   if (!profile.isValid) {
-    return (
-      <PageLayout>
-        <NotFoundContent />
-      </PageLayout>
-    );
+    return <NotFoundContent />;
   }
 
   return (
-    <PageLayout>
+    <>
       {/* Profile Section */}
       <div className="flex flex-col items-center gap-6">
         {/* Profile Picture */}
@@ -102,6 +97,6 @@ export function ProfilePage() {
           )}
         </div>
       </div>
-    </PageLayout>
+    </>
   );
 }

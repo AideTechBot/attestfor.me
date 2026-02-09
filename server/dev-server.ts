@@ -38,7 +38,7 @@ app.get("/*", async (req, res) => {
     if (entryModule) {
       const visited = new Set<string>();
       const collectCss = async (mod: typeof entryModule) => {
-        if (!mod || visited.has(mod.url)) return;
+        if (!mod || visited.has(mod.url)) {return;}
         visited.add(mod.url);
 
         if (mod.url.endsWith(".css")) {

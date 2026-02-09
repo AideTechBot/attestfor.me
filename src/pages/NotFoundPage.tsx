@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import { PageLayout } from "../components/PageLayout";
 
 export function NotFoundContent() {
   return (
@@ -17,9 +16,5 @@ export function NotFoundContent() {
 }
 
 export function NotFoundPage() {
-  return (
-    <PageLayout>
-      <NotFoundContent />
-    </PageLayout>
-  );
+  return <NotFoundContent />;
 }

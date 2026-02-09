@@ -1,8 +1,7 @@
-import { PageLayout } from "../components/PageLayout";
 
 export function HomePage() {
   return (
-    <PageLayout>
+    <>
       {/* Centered Logo and Tagline */}
       <div className="text-center mb-8 shrink-0">
         <h1 className="text-5xl font-bold text-accent m-0 mb-2">
@@ -24,6 +23,6 @@ export function HomePage() {
           your cryptographic keys in a decentralized way using the AT protocol.
         </p>
       </div>
-    </PageLayout>
+    </>
   );
 }

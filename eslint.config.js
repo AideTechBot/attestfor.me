@@ -27,6 +27,7 @@ export default defineConfig([
           fixStyle: "separate-type-imports",
         },
       ],
+      curly: ["error", "all"],
     },
   },
 ]);

@@ -1,0 +1,73 @@
+/* Shared animation duration — change this one value to adjust all search bar animations */
+:root {
+  --search-anim-duration: 0.15s;
+}
+
+/* Search bar animation and glow */
+.search-input {
+  transition:
+    box-shadow var(--search-anim-duration) cubic-bezier(.4,0,.2,1),
+    border-color var(--search-anim-duration) cubic-bezier(.4,0,.2,1);
+  box-shadow: none;
+}
+
+.search-input.search-active {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 12px 2px var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+/*
+ * Transitions are gated behind the .search-ready class on the header.
+ * This class is added after the first measurement via requestAnimationFrame,
+ * preventing the initial render from animating to the correct position.
+ */
+
+/* Form starts as a flex child (no absolute positioning) to avoid layout jump.
+ * After the first measurement, .search-ready switches it to absolute with transitions. */
+.search-form-base {
+  position: relative;
+  flex: 1;
+}
+.search-ready .search-form-base {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  flex: none;
+  transition:
+    left var(--search-anim-duration) cubic-bezier(.4,0,.2,1),
+    right var(--search-anim-duration) cubic-bezier(.4,0,.2,1),
+    opacity var(--search-anim-duration) cubic-bezier(.4,0,.2,1);
+}
+
+/* Expanded (focused) state — only meaningful when absolute */
+.search-ready .search-form-expanded {
+  left: 0;
+  right: 0;
+}
+
+/* Logo & avatar transitions — only after first measurement */
+.search-anim-child {
+  /* No transition by default */
+}
+.search-ready .search-anim-child {
+  transition: all var(--search-anim-duration) cubic-bezier(.4,0,.2,1);
+}
+
+/* Resting position classes — only apply when absolute (after .search-ready) */
+.search-ready .search-form-resting-left {
+  left: var(--search-left, 0px);
+}
+.search-ready .search-form-resting-right {
+  right: var(--search-right, 44px);
+}
+
+/* Spacer: hidden before ready (form is flex:1), visible after (form is absolute) */
+.search-spacer {
+  display: none;
+}
+.search-ready .search-spacer {
+  display: block;
+  flex: 1;
+}
