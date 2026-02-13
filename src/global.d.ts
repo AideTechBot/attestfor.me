@@ -4,3 +4,7 @@ declare const process: {
     PORT: number;
   };
 };
+
+interface Window {
+  __HAS_SESSION__?: boolean;
+}

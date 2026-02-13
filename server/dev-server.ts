@@ -74,6 +74,7 @@ app.get("/*", async (req, res) => {
       render: (request: Request) => Promise<{
         html: string;
         notFound: boolean;
+        hasSession: boolean;
         redirect?: Response;
       }>;
     };
@@ -99,8 +100,13 @@ app.get("/*", async (req, res) => {
       }
     }
 
-    const { html, notFound } = result;
-    const htmlWithApp = template.replace("<!--app-html-->", html);
+    const { html, notFound, hasSession } = result;
+
+    // Inject the session hint so client hydration matches SSR output
+    const hasSessionScript = `<script>window.__HAS_SESSION__=${hasSession ? "true" : "false"}</script>`;
+    const htmlWithApp = template
+      .replace("<!--app-html-->", html)
+      .replace('<div id="root">', hasSessionScript + '<div id="root">');
 
     if (notFound) {
       res.status(404);

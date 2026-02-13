@@ -11,6 +11,7 @@ import {
   FOLLOWERS_TTL,
   AVATAR_TTL,
 } from "./cache-ttl";
+import { SESSION_COOKIE_NAME } from "../src/lib/constants";
 import crypto from "crypto";
 
 import type { FastifyInstance } from "fastify";
@@ -247,7 +248,7 @@ export async function setupApp(app: FastifyInstance) {
         did: session.sub,
       });
 
-      res.setCookie("session", sessionId, {
+      res.setCookie(SESSION_COOKIE_NAME, sessionId, {
         httpOnly: true,
         secure: true, // HTTPS required
         sameSite: "lax",
@@ -278,23 +279,23 @@ export async function setupApp(app: FastifyInstance) {
   });
 
   app.get("/api/auth/logout", async (req, res) => {
-    const sessionId = req.cookies.session;
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
     if (sessionId) {
       await deleteSession(sessionId);
     }
-    res.clearCookie("session");
+    res.clearCookie(SESSION_COOKIE_NAME);
     res.redirect("/");
   });
 
   app.get("/api/auth/session", async (req, res) => {
-    const sessionId = req.cookies.session;
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
     if (!sessionId) {
       return res.send({ authenticated: false });
     }
 
     const sessionData = await getSession(sessionId);
     if (!sessionData) {
-      res.clearCookie("session");
+      res.clearCookie(SESSION_COOKIE_NAME);
       return res.send({ authenticated: false });
     }
 
@@ -302,7 +303,7 @@ export async function setupApp(app: FastifyInstance) {
       const oauthSession = await oauthClient.restore(sessionData.did);
       if (!oauthSession) {
         await deleteSession(sessionId);
-        res.clearCookie("session");
+        res.clearCookie(SESSION_COOKIE_NAME);
         return res.send({ authenticated: false });
       }
 
@@ -354,11 +355,12 @@ export async function setupApp(app: FastifyInstance) {
         JSON.stringify(sessionResponse),
         SESSION_PROFILE_TTL,
       );
+
       res.send(sessionResponse);
     } catch (error) {
       console.error("Session error:", error);
       await deleteSession(sessionId);
-      res.clearCookie("session");
+      res.clearCookie(SESSION_COOKIE_NAME);
       res.send({ authenticated: false });
     }
   });

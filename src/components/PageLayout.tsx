@@ -1,4 +1,10 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { User, ExternalLink, X } from "lucide-react";
 import { useNavigate, useLocation, Link, Outlet } from "react-router";
 import {
@@ -16,6 +22,7 @@ import {
   removeRecentSearch,
 } from "@/lib/recent-searches";
 import { SearchPopup } from "./SearchPopup";
+import { useSessionHint } from "@/lib/session-hint";
 import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
 import "./search-animated.css";
@@ -46,6 +53,31 @@ const FOOTER_LINKS = [
   { href: "https://tangled.com/repo/attestfor.me", label: "tangled" },
 ] as const;
 
+function HeaderAvatar({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+
+  const imgRef = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete) {
+      setLoaded(true);
+    }
+  }, []);
+
+  return (
+    <>
+      {!loaded && (
+        <div className="absolute inset-0 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800 animate-pulse" />
+      )}
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+        onLoad={() => setLoaded(true)}
+      />
+    </>
+  );
+}
+
 export function PageLayout({ children }: PageLayoutProps) {
   const [searchValue, setSearchValue] = useState("");
   const [loginHandle, setLoginHandle] = useState("");
@@ -72,6 +104,9 @@ export function PageLayout({ children }: PageLayoutProps) {
 
   const isHomePage = location.pathname === "/" || location.pathname === "/home";
   const isOwnProfile = location.pathname === `/@${session.handle}`;
+
+  // Check if user likely has a session (set via cookie, available during SSR)
+  const maybeAuthenticated = useSessionHint();
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -281,20 +316,21 @@ export function PageLayout({ children }: PageLayoutProps) {
           >
             <DropdownMenuTrigger
               className={cn(
-                "w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
+                "relative w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
                 "flex items-center justify-center text-muted text-xs shrink-0 leading-none overflow-hidden",
                 "hover:border-accent transition-colors cursor-pointer outline-none",
                 "data-[state=open]:border-accent",
                 "search-anim-child",
                 searchFocused && "opacity-0 pointer-events-none",
-                !sessionLoaded && "invisible",
               )}
             >
-              {session.authenticated && session.avatar ? (
-                <img
+              {!sessionLoaded && maybeAuthenticated ? (
+                <div className="absolute inset-0 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800 animate-pulse" />
+              ) : session.authenticated && session.avatar ? (
+                <HeaderAvatar
+                  key={session.avatar}
                   src={`${session.avatar}&size=thumbnail`}
-                  alt={session.displayName || session.handle}
-                  className="w-full h-full object-cover"
+                  alt={session.displayName || session.handle || ""}
                 />
               ) : (
                 <User className="w-5 h-5" />
@@ -374,7 +410,7 @@ export function PageLayout({ children }: PageLayoutProps) {
       {/* Footer */}
       <footer className="mt-3 flex justify-center gap-4 text-xs text-muted">
         {FOOTER_LINKS.map((link, i) => (
-          <span key={link.href} className="contents">
+          <span key={link.label} className="contents">
             {i > 0 && <span>·</span>}
             <a href={link.href} className="hover:text-accent transition-colors">
               {link.label}
