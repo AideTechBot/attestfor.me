@@ -10,45 +10,64 @@ interface ProfileData {
   isValid: boolean;
 }
 
+/**
+ * Determine the base URL for server API calls.
+ * During SSR (Node.js), we need an absolute URL pointing to our own server.
+ * During client-side navigation (browser), relative URLs work fine.
+ */
+function getApiBase(request?: Request): string {
+  // Client-side: use relative URLs
+  if (typeof window !== "undefined") {
+    return "";
+  }
+  // SSR: derive from the incoming request or use env/fallback
+  if (request) {
+    const url = new URL(request.url);
+    return url.origin;
+  }
+  const port = process.env.PORT || "3000";
+  return `http://localhost:${port}`;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export async function profileLoader({
   params,
+  request,
 }: LoaderFunctionArgs): Promise<ProfileData> {
   const handle = params.handle;
-  console.log("[ProfileLoader] Received handle param:", handle);
 
   if (!handle) {
-    console.log("[ProfileLoader] No handle provided");
     return { handle: "", isValid: false };
   }
 
   // Remove @ prefix if present (handle comes from URL like /@manoo.dev)
   const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
-  console.log("[ProfileLoader] Clean handle:", cleanHandle);
 
   // Skip requests for static files that hit the /:handle route (e.g. favicon.ico)
-  if (/\.(ico|png|jpg|jpeg|svg|webp|gif|js|css|map|json|txt|xml|webmanifest)$/i.test(cleanHandle)) {
+  if (
+    /\.(ico|png|jpg|jpeg|svg|webp|gif|js|css|map|json|txt|xml|webmanifest)$/i.test(
+      cleanHandle,
+    )
+  ) {
     return { handle: cleanHandle, isValid: false };
   }
 
   try {
-    // Fetch profile from Bluesky API
-    const url = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${cleanHandle}`;
-    console.log("[ProfileLoader] Fetching from:", url);
+    const apiBase = getApiBase(request);
+    const res = await fetch(
+      `${apiBase}/api/atproto/profile?actor=${encodeURIComponent(cleanHandle)}`,
+    );
 
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      console.log(
-        "[ProfileLoader] API response not OK:",
-        response.status,
-        response.statusText,
-      );
+    if (!res.ok) {
       return { handle: cleanHandle, isValid: false };
     }
 
-    const data = await response.json();
-    console.log("[ProfileLoader] Success! Got profile for:", data.handle);
+    const data = (await res.json()) as {
+      handle: string;
+      displayName?: string;
+      description?: string;
+      avatar?: string;
+    };
 
     return {
       handle: data.handle,
@@ -77,7 +96,7 @@ export function ProfilePage() {
         {/* Profile Picture */}
         {profile.avatar ? (
           <img
-            src={profile.avatar}
+            src={`${profile.avatar}&size=thumbnail`}
             alt={profile.displayName || profile.handle}
             className="w-30 h-30 object-cover shadow-lg shadow-accent-subtle"
           />

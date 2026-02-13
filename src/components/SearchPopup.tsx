@@ -1,13 +1,13 @@
 import { X, Loader2 } from "lucide-react";
-import type { BlueskyActor } from "@/lib/use-bluesky-search";
+import type { AtprotoActor } from "@/lib/use-atproto-search";
 
 interface SearchPopupProps {
   visible: boolean;
   searchValue: string;
   recentSearches: string[];
-  suggestions: BlueskyActor[];
+  suggestions: AtprotoActor[];
   suggestionsLoading: boolean;
-  followSuggestions: BlueskyActor[];
+  followSuggestions: AtprotoActor[];
   onSelect: (handle: string) => void;
   onRemove: (handle: string) => void;
   onClearAll: () => void;
@@ -24,7 +24,9 @@ export function SearchPopup({
   onRemove,
   onClearAll,
 }: SearchPopupProps) {
-  if (!visible) { return null; }
+  if (!visible) {
+    return null;
+  }
 
   const trimmed = searchValue.trim();
   const cleanQuery = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
@@ -37,11 +39,15 @@ export function SearchPopup({
     : recentSearches;
 
   const showGoTo = cleanQuery.length > 0;
-  const showSuggestions = cleanQuery.length > 0 && (suggestions.length > 0 || suggestionsLoading);
-  const showFollowSuggestions = cleanQuery.length === 0 && followSuggestions.length > 0;
+  const showSuggestions =
+    cleanQuery.length > 0 && (suggestions.length > 0 || suggestionsLoading);
+  const showFollowSuggestions =
+    cleanQuery.length === 0 && followSuggestions.length > 0;
   const showRecent = filtered.length > 0;
 
-  if (!showGoTo && !showRecent && !showFollowSuggestions) { return null; }
+  if (!showGoTo && !showRecent && !showFollowSuggestions) {
+    return null;
+  }
 
   return (
     <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-surface border border-surface-border shadow-lg overflow-hidden">
@@ -58,7 +64,7 @@ export function SearchPopup({
         </button>
       )}
 
-      {/* Bluesky suggestions */}
+      {/* AT Protocol suggestions */}
       {showSuggestions && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 border-t border-surface-border">
@@ -77,7 +83,7 @@ export function SearchPopup({
             >
               {actor.avatar ? (
                 <img
-                  src={actor.avatar}
+                  src={`${actor.avatar}&size=thumbnail`}
                   alt=""
                   className="w-6 h-6 object-cover shrink-0"
                 />
@@ -117,7 +123,7 @@ export function SearchPopup({
             >
               {actor.avatar ? (
                 <img
-                  src={actor.avatar}
+                  src={`${actor.avatar}&size=thumbnail`}
                   alt=""
                   className="w-6 h-6 object-cover shrink-0"
                 />

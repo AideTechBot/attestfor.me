@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-export interface BlueskyActor {
+export interface AtprotoActor {
   handle: string;
   displayName?: string;
   avatar?: string;
@@ -9,8 +9,8 @@ export interface BlueskyActor {
 const DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 5;
 
-export function useBlueskySearch(query: string, enabled: boolean) {
-  const [results, setResults] = useState<BlueskyActor[]>([]);
+export function useAtprotoSearch(query: string, enabled: boolean) {
+  const [results, setResults] = useState<AtprotoActor[]>([]);
   const [fetchedQuery, setFetchedQuery] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
@@ -29,7 +29,7 @@ export function useBlueskySearch(query: string, enabled: boolean) {
       abortRef.current = controller;
 
       fetch(
-        `https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_LIMIT}`,
+        `/api/atproto/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_LIMIT}`,
         { signal: controller.signal },
       )
         .then((res) => {
@@ -39,7 +39,7 @@ export function useBlueskySearch(query: string, enabled: boolean) {
           return res.json();
         })
         .then((data) => {
-          const actors: BlueskyActor[] = (data.actors ?? []).map(
+          const actors: AtprotoActor[] = (data.actors ?? []).map(
             (a: { handle: string; displayName?: string; avatar?: string }) => ({
               handle: a.handle,
               displayName: a.displayName,

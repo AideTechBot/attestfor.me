@@ -36,7 +36,8 @@ const clientMetadata = clientMetadataJson as unknown as OAuthClientMetadata;
 export const oauthClient = new NodeOAuthClient({
   clientMetadata,
   keyset: [privateKey],
-  handleResolver: "https://bsky.social",
+  // Default resolver uses AT Protocol standard resolution:
+  // DNS TXT (_atproto.<handle>) + HTTP well-known (https://<handle>/.well-known/atproto-did)
   stateStore: {
     async set(key, internalState) {
       // OAuth state (PKCE verifiers, etc.) - short TTL

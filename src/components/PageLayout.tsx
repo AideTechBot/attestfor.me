@@ -16,7 +16,7 @@ import {
   removeRecentSearch,
 } from "@/lib/recent-searches";
 import { SearchPopup } from "./SearchPopup";
-import { useBlueskySearch } from "@/lib/use-bluesky-search";
+import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
 import "./search-animated.css";
 
@@ -38,8 +38,10 @@ const MENU_ITEM_CLASS =
   "px-4 py-3 sm:py-2 text-base sm:text-sm rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white";
 
 const FOOTER_LINKS = [
-  { href: "https://bsky.app/profile/manoo.dev", label: "made by manoo" },
-  { href: "https://bsky.app/profile/attestfor.me", label: "bluesky" },
+  {
+    href: "https://github.com/AideTechBot/attestfor.me",
+    label: "made by manoo",
+  },
   { href: "https://github.com/AideTechBot/attestfor.me", label: "github" },
   { href: "https://tangled.com/repo/attestfor.me", label: "tangled" },
 ] as const;
@@ -54,7 +56,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
   const { results: suggestions, loading: suggestionsLoading } =
-    useBlueskySearch(searchValue, searchFocused);
+    useAtprotoSearch(searchValue, searchFocused);
 
   const followSuggestions = useRandomFollowers(
     session.authenticated ? session.handle : undefined,
@@ -290,7 +292,7 @@ export function PageLayout({ children }: PageLayoutProps) {
             >
               {session.authenticated && session.avatar ? (
                 <img
-                  src={session.avatar}
+                  src={`${session.avatar}&size=thumbnail`}
                   alt={session.displayName || session.handle}
                   className="w-full h-full object-cover"
                 />
@@ -317,7 +319,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                     <div className="flex flex-col gap-2">
                       <input
                         type="text"
-                        placeholder="your-handle.bsky.social"
+                        placeholder="your.handle.example"
                         value={loginHandle}
                         onChange={(e) => setLoginHandle(e.target.value)}
                         onKeyDown={(e) => {

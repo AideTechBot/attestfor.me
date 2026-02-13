@@ -23,7 +23,6 @@
     "pre-commit": "pnpm lint"
   },
   "dependencies": {
-    "@atproto/api": "^0.18.20",
     "@atproto/jwk-jose": "^0.1.11",
     "@atproto/oauth-client-node": "^0.3.16",
     "@fastify/cookie": "^11.0.2",

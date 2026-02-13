@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import type { BlueskyActor } from "./use-bluesky-search";
+import type { AtprotoActor } from "./use-atproto-search";
 
 const PICK_COUNT = 5;
 const FOLLOWERS_FETCH_LIMIT = 50; // Fetch a decent pool to randomize from
 
 /**
- * Fetches followers for the given handle from the public Bluesky API,
+ * Fetches followers for the given handle via the server-side AT Protocol proxy,
  * then picks `PICK_COUNT` random ones. Results are cached so that
  * re-focusing the search bar doesn't re-fetch or re-shuffle.
  */
 export function useRandomFollowers(handle: string | undefined) {
-  const [followers, setFollowers] = useState<BlueskyActor[]>([]);
+  const [followers, setFollowers] = useState<AtprotoActor[]>([]);
   const fetchedForRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export function useRandomFollowers(handle: string | undefined) {
     const controller = new AbortController();
 
     fetch(
-      `https://public.api.bsky.app/xrpc/app.bsky.graph.getFollowers?actor=${encodeURIComponent(handle)}&limit=${FOLLOWERS_FETCH_LIMIT}`,
+      `/api/atproto/followers?actor=${encodeURIComponent(handle)}&limit=${FOLLOWERS_FETCH_LIMIT}`,
       { signal: controller.signal },
     )
       .then((res) => {
@@ -34,7 +34,7 @@ export function useRandomFollowers(handle: string | undefined) {
         return res.json();
       })
       .then((data) => {
-        const all: BlueskyActor[] = (data.followers ?? []).map(
+        const all: AtprotoActor[] = (data.followers ?? []).map(
           (f: { handle: string; displayName?: string; avatar?: string }) => ({
             handle: f.handle,
             displayName: f.displayName,

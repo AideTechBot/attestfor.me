@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@atproto/api':
-        specifier: ^0.18.20
-        version: 0.18.20
       '@atproto/jwk-jose':
         specifier: ^0.1.11
         version: 0.1.11
@@ -145,9 +142,6 @@ packages:
 
   '@atproto-labs/simple-store@0.3.0':
     resolution: {integrity: sha512-nOb6ONKBRJHRlukW1sVawUkBqReLlLx6hT35VS3imaNPwiXDxLnTK7lxw3Lrl9k5yugSBDQAkZAq3MPTEFSUBQ==}
-
-  '@atproto/api@0.18.20':
-    resolution: {integrity: sha512-BZYZkh2VJIFCXEnc/vzKwAwWjAQQTgbNJ8FBxpBK+z+KYh99O0uPCsRYKoCQsRrnkgrhzdU9+g2G+7zanTIGbw==}
 
   '@atproto/common-web@0.4.15':
     resolution: {integrity: sha512-A4l9gyqUNez8CjZp/Trypz/D3WIQsNj8dN05WR6+RoBbvwc9JhWjKPrm+WoVYc/F16RPdXHLkE3BEJlGIyYIiA==}
@@ -1220,9 +1214,6 @@ packages:
   avvio@9.1.0:
     resolution: {integrity: sha512-fYASnYi600CsH/j9EQov7lECAniYiBFiiAtBNuZYLA2leLe9qOvZzqYHFjtIj6gD2VMoMLP14834LFWvr4IfDw==}
 
-  await-lock@2.2.2:
-    resolution: {integrity: sha512-aDczADvlvTGajTDjcjpJMqRkOF6Qdz3YbPZm/PyW6tKPkx2hlYBzxMhEywM/tU72HrVZjgl5VCdRuMlA7pZ8Gw==}
-
   babel-plugin-react-compiler@1.0.0:
     resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
 
@@ -2212,10 +2203,6 @@ packages:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
     engines: {node: '>=12.0.0'}
 
-  tlds@1.261.0:
-    resolution: {integrity: sha512-QXqwfEl9ddlGBaRFXIvNKK6OhipSiLXuRuLJX5DErz0o0Q0rYxulWLdFryTkV5PkdZct5iMInwYEGe/eR++1AA==}
-    hasBin: true
-
   toad-cache@3.7.0:
     resolution: {integrity: sha512-/m8M+2BJUpoJdgAHoG+baCwBT+tf2VraSfkBgl0Y00qIWt41DJ8R5B8nsEw0I58YwF5IZH6z24/2TobDKnqSWw==}
     engines: {node: '>=12'}
@@ -2449,17 +2436,6 @@ snapshots:
       lru-cache: 10.4.3
 
   '@atproto-labs/simple-store@0.3.0': {}
-
-  '@atproto/api@0.18.20':
-    dependencies:
-      '@atproto/common-web': 0.4.15
-      '@atproto/lexicon': 0.6.1
-      '@atproto/syntax': 0.4.3
-      '@atproto/xrpc': 0.7.7
-      await-lock: 2.2.2
-      multiformats: 9.9.0
-      tlds: 1.261.0
-      zod: 3.25.76
 
   '@atproto/common-web@0.4.15':
     dependencies:
@@ -3498,8 +3474,6 @@ snapshots:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
 
-  await-lock@2.2.2: {}
-
   babel-plugin-react-compiler@1.0.0:
     dependencies:
       '@babel/types': 7.29.0
@@ -4495,8 +4469,6 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
-
-  tlds@1.261.0: {}
 
   toad-cache@3.7.0: {}
 
