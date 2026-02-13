@@ -35,7 +35,7 @@ const LOGO_MARGIN = 8; // mr-2 = 8px
 const AVATAR_MARGIN = 12; // ml-3 = 12px
 
 const MENU_ITEM_CLASS =
-  "px-4 py-2 rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white";
+  "px-4 py-3 sm:py-2 text-base sm:text-sm rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white";
 
 const FOOTER_LINKS = [
   { href: "https://bsky.app/profile/manoo.dev", label: "made by manoo" },
@@ -43,7 +43,6 @@ const FOOTER_LINKS = [
   { href: "https://github.com/AideTechBot/attestfor.me", label: "github" },
   { href: "https://tangled.com/repo/attestfor.me", label: "tangled" },
 ] as const;
-
 
 export function PageLayout({ children }: PageLayoutProps) {
   const [searchValue, setSearchValue] = useState("");
@@ -54,10 +53,8 @@ export function PageLayout({ children }: PageLayoutProps) {
   const [session, setSession] = useState<SessionData>({ authenticated: false });
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
-  const { results: suggestions, loading: suggestionsLoading } = useBlueskySearch(
-    searchValue,
-    searchFocused,
-  );
+  const { results: suggestions, loading: suggestionsLoading } =
+    useBlueskySearch(searchValue, searchFocused);
 
   const followSuggestions = useRandomFollowers(
     session.authenticated ? session.handle : undefined,
@@ -73,7 +70,6 @@ export function PageLayout({ children }: PageLayoutProps) {
 
   const isHomePage = location.pathname === "/" || location.pathname === "/home";
   const isOwnProfile = location.pathname === `/@${session.handle}`;
-
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -100,7 +96,9 @@ export function PageLayout({ children }: PageLayoutProps) {
   // Measure logo/avatar widths and set CSS custom properties on the header
   useEffect(() => {
     const header = headerRef.current;
-    if (!header) {return;}
+    if (!header) {
+      return;
+    }
 
     const update = () => {
       const logoW =
@@ -122,14 +120,19 @@ export function PageLayout({ children }: PageLayoutProps) {
     update();
 
     const ro = new ResizeObserver(update);
-    if (logoRef.current) {ro.observe(logoRef.current);}
-    if (avatarRef.current) {ro.observe(avatarRef.current);}
+    if (logoRef.current) {
+      ro.observe(logoRef.current);
+    }
+    if (avatarRef.current) {
+      ro.observe(avatarRef.current);
+    }
     return () => ro.disconnect();
   }, [isHomePage]);
 
-
   const handleLogin = () => {
-    if (!loginHandle.trim()) {return;}
+    if (!loginHandle.trim()) {
+      return;
+    }
     window.location.href = `/api/auth/login?handle=${encodeURIComponent(loginHandle)}`;
   };
 
@@ -139,8 +142,12 @@ export function PageLayout({ children }: PageLayoutProps) {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchValue.trim()) {return;}
-    const clean = searchValue.startsWith("@") ? searchValue.slice(1) : searchValue;
+    if (!searchValue.trim()) {
+      return;
+    }
+    const clean = searchValue.startsWith("@")
+      ? searchValue.slice(1)
+      : searchValue;
     addRecentSearch(clean);
     setRecentSearches(getRecentSearches());
     navigate(`/@${clean}`);
@@ -171,7 +178,6 @@ export function PageLayout({ children }: PageLayoutProps) {
     inputRef.current?.focus();
   };
 
-
   return (
     <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
       {/* Header */}
@@ -181,7 +187,9 @@ export function PageLayout({ children }: PageLayoutProps) {
           ref={logoRef}
           className={cn(
             "overflow-hidden whitespace-nowrap search-anim-child",
-            isHomePage ? "max-w-0 opacity-0 mr-0" : "max-w-[10rem] opacity-100 mr-2",
+            isHomePage
+              ? "max-w-0 opacity-0 mr-0"
+              : "max-w-[10rem] opacity-100 mr-2",
             searchFocused && "!opacity-0 pointer-events-none",
           )}
         >
@@ -225,12 +233,17 @@ export function PageLayout({ children }: PageLayoutProps) {
                   inputRef.current?.blur();
                 }
               }}
-              className={cn("pr-8 w-full h-full search-input", searchFocused && "search-active")}
+              className={cn(
+                "pr-8 w-full h-full search-input",
+                searchFocused && "search-active",
+              )}
             />
             {searchValue && (
               <button
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                }}
                 onClick={clearSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
               >
@@ -256,7 +269,14 @@ export function PageLayout({ children }: PageLayoutProps) {
 
         {/* User menu */}
         <div ref={avatarRef} className="ml-3">
-          <DropdownMenu>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (!open) {
+                setShowLoginInput(false);
+                setLoginHandle("");
+              }
+            }}
+          >
             <DropdownMenuTrigger
               className={cn(
                 "w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
@@ -289,7 +309,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                   {!showLoginInput ? (
                     <button
                       onClick={() => setShowLoginInput(true)}
-                      className="w-full px-4 py-2 text-left hover:bg-accent hover:text-white focus:bg-accent focus:text-white transition-colors"
+                      className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm text-left hover:bg-accent hover:text-white focus:bg-accent focus:text-white transition-colors"
                     >
                       Sign in
                     </button>
@@ -301,15 +321,19 @@ export function PageLayout({ children }: PageLayoutProps) {
                         value={loginHandle}
                         onChange={(e) => setLoginHandle(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {handleLogin();}
-                          if (e.key === "Escape") {setShowLoginInput(false);}
+                          if (e.key === "Enter") {
+                            handleLogin();
+                          }
+                          if (e.key === "Escape") {
+                            setShowLoginInput(false);
+                          }
                         }}
-                        className="w-full px-3 py-2 bg-input border border-surface-border text-inherit text-sm outline-none focus:border-accent"
+                        className="w-full px-3 py-3 sm:py-2 bg-input border border-surface-border text-inherit text-base sm:text-sm outline-none focus:border-accent"
                         autoFocus
                       />
                       <button
                         onClick={handleLogin}
-                        className="w-full px-4 py-2 bg-accent text-white text-sm hover:bg-accent-hover transition-colors"
+                        className="w-full px-4 py-3 sm:py-2 bg-accent text-white text-base sm:text-sm hover:bg-accent-hover transition-colors"
                       >
                         Continue
                       </button>
@@ -327,7 +351,10 @@ export function PageLayout({ children }: PageLayoutProps) {
                       <ExternalLink className="w-4 h-4 ml-auto" />
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem className={MENU_ITEM_CLASS} onSelect={handleLogout}>
+                  <DropdownMenuItem
+                    className={MENU_ITEM_CLASS}
+                    onSelect={handleLogout}
+                  >
                     Sign out
                   </DropdownMenuItem>
                 </>
@@ -338,7 +365,9 @@ export function PageLayout({ children }: PageLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 border border-surface-border p-6">{children ?? <Outlet />}</div>
+      <div className="flex-1 border border-surface-border p-6">
+        {children ?? <Outlet />}
+      </div>
 
       {/* Footer */}
       <footer className="mt-3 flex justify-center gap-4 text-xs text-muted">
