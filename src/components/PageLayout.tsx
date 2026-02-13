@@ -337,6 +337,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                           }
                         }}
                         className="w-full px-3 py-3 sm:py-2 bg-input border border-surface-border text-inherit text-base sm:text-sm outline-none focus:border-accent"
+                        autoComplete="username"
                         autoFocus
                       />
                       <button
