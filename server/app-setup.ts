@@ -2,6 +2,15 @@ import fastifyCookie from "@fastify/cookie";
 import fs from "fs";
 import path from "path";
 import { oauthClient, getSession, setSession, deleteSession } from "./oauth";
+import { store } from "./storage";
+import {
+  DID_DOC_TTL,
+  HANDLE_TTL,
+  PROFILE_TTL,
+  SESSION_PROFILE_TTL,
+  FOLLOWERS_TTL,
+  AVATAR_TTL,
+} from "./cache-ttl";
 import crypto from "crypto";
 
 import type { FastifyInstance } from "fastify";
@@ -19,6 +28,12 @@ interface DidDocument {
  * Supports did:plc (via plc.directory) and did:web.
  */
 async function resolveDidDocument(did: string): Promise<DidDocument> {
+  const cacheKey = `didDoc:${did}`;
+  const cached = await store.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached) as DidDocument;
+  }
+
   let url: string;
   if (did.startsWith("did:plc:")) {
     url = `https://plc.directory/${did}`;
@@ -33,7 +48,9 @@ async function resolveDidDocument(did: string): Promise<DidDocument> {
   if (!res.ok) {
     throw new Error(`Failed to resolve DID document for ${did}: ${res.status}`);
   }
-  return res.json() as Promise<DidDocument>;
+  const doc = (await res.json()) as DidDocument;
+  await store.set(cacheKey, JSON.stringify(doc), DID_DOC_TTL);
+  return doc;
 }
 
 /**
@@ -60,6 +77,12 @@ function getPdsEndpoint(didDoc: DidDocument): string | undefined {
  * Falls back to a well-known endpoint if needed.
  */
 async function resolveHandle(handle: string): Promise<string | null> {
+  const cacheKey = `handle:${handle.toLowerCase()}`;
+  const cached = await store.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // Method 1: DNS TXT record at _atproto.<handle>
   // Many custom domain handles (e.g. manoo.dev) only have a DNS TXT record
   try {
@@ -69,6 +92,7 @@ async function resolveHandle(handle: string): Promise<string | null> {
       const joined = record.join("");
       const match = joined.match(/^did=(.+)$/);
       if (match && match[1].startsWith("did:")) {
+        await store.set(cacheKey, match[1], HANDLE_TTL);
         return match[1];
       }
     }
@@ -87,6 +111,7 @@ async function resolveHandle(handle: string): Promise<string | null> {
     if (dnsRes.ok) {
       const did = (await dnsRes.text()).trim();
       if (did.startsWith("did:")) {
+        await store.set(cacheKey, did, HANDLE_TTL);
         return did;
       }
     }
@@ -105,6 +130,7 @@ async function resolveHandle(handle: string): Promise<string | null> {
     clearTimeout(timeout);
     if (res.ok) {
       const data = (await res.json()) as { did: string };
+      await store.set(cacheKey, data.did, HANDLE_TTL);
       return data.did;
     }
   } catch {
@@ -126,6 +152,12 @@ async function fetchProfileFromPds(
   description?: string;
   avatar?: string;
 } | null> {
+  const cacheKey = `profile:${did}`;
+  const cached = await store.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   try {
     const didDoc = await resolveDidDocument(did);
     const handle = getHandleFromDidDoc(didDoc) || did;
@@ -152,7 +184,9 @@ async function fetchProfileFromPds(
       }
     }
 
-    return { handle, displayName, description, avatar };
+    const profile = { handle, displayName, description, avatar };
+    await store.set(cacheKey, JSON.stringify(profile), PROFILE_TTL);
+    return profile;
   } catch {
     return null;
   }
@@ -272,6 +306,13 @@ export async function setupApp(app: FastifyInstance) {
         return res.send({ authenticated: false });
       }
 
+      // Check cache for session profile data
+      const sessionCacheKey = `sessionProfile:${sessionData.did}`;
+      const cachedSession = await store.get(sessionCacheKey);
+      if (cachedSession) {
+        return res.send(JSON.parse(cachedSession));
+      }
+
       // Resolve the DID document to get handle and PDS endpoint
       const didDoc = await resolveDidDocument(sessionData.did);
       const handle = getHandleFromDidDoc(didDoc);
@@ -301,13 +342,19 @@ export async function setupApp(app: FastifyInstance) {
         }
       }
 
-      res.send({
+      const sessionResponse = {
         authenticated: true,
         did: sessionData.did,
         handle: handle || sessionData.did,
         displayName,
         avatar,
-      });
+      };
+      await store.set(
+        sessionCacheKey,
+        JSON.stringify(sessionResponse),
+        SESSION_PROFILE_TTL,
+      );
+      res.send(sessionResponse);
     } catch (error) {
       console.error("Session error:", error);
       await deleteSession(sessionId);
@@ -433,6 +480,13 @@ export async function setupApp(app: FastifyInstance) {
         return res.send({ followers: [] });
       }
 
+      // Check cache for followers
+      const followersCacheKey = `followers:${did}:${limit}`;
+      const cachedFollowers = await store.get(followersCacheKey);
+      if (cachedFollowers) {
+        return res.send(JSON.parse(cachedFollowers));
+      }
+
       // List follow records from the actor's repo to find who follows them
       // Note: In AT Protocol, "followers" are people who have follow records pointing to this actor.
       // Since we can't easily enumerate all repos, we list the actor's own follows as suggestions.
@@ -482,7 +536,13 @@ export async function setupApp(app: FastifyInstance) {
         }
       }
 
-      res.send({ followers });
+      const followersResponse = { followers };
+      await store.set(
+        followersCacheKey,
+        JSON.stringify(followersResponse),
+        FOLLOWERS_TTL,
+      );
+      res.send(followersResponse);
     } catch (error) {
       console.error("Followers error:", error);
       res.status(500).send({ error: "Failed to fetch followers" });
@@ -567,6 +627,16 @@ export async function setupApp(app: FastifyInstance) {
             ? "avatar" // 1000×1000 (default)
             : null; // "fullsize" → skip CDN, fetch raw blob
 
+      // Check server-side cache for avatar blobs (CIDs are immutable)
+      const avatarCacheKey = `avatar:${did}:${cid}:${safeSize}`;
+      const cachedAvatar = await store.get(avatarCacheKey);
+      if (cachedAvatar) {
+        const { contentType: ct, data } = JSON.parse(cachedAvatar);
+        res.header("Content-Type", ct);
+        res.header("Cache-Control", `public, max-age=${AVATAR_TTL}, immutable`);
+        return res.send(Buffer.from(data, "base64"));
+      }
+
       let imageRes: Response | null = null;
 
       // Try CDN first for sized variants
@@ -599,11 +669,7 @@ export async function setupApp(app: FastifyInstance) {
 
       const contentType = imageRes.headers.get("content-type") || "image/jpeg";
 
-      // Cache aggressively — CIDs are content-addressed (immutable)
-      res.header("Content-Type", contentType);
-      res.header("Cache-Control", "public, max-age=604800, immutable");
-
-      // Read and send the image buffer
+      // Read the image buffer
       const reader = imageRes.body!.getReader();
       const chunks: Uint8Array[] = [];
       while (true) {
@@ -614,6 +680,19 @@ export async function setupApp(app: FastifyInstance) {
         chunks.push(value);
       }
       const buffer = Buffer.concat(chunks);
+
+      // Cache the blob server-side — CIDs are content-addressed (immutable)
+      // Only cache if under 512KB to avoid bloating the cache
+      if (buffer.length < 512 * 1024) {
+        await store.set(
+          avatarCacheKey,
+          JSON.stringify({ contentType, data: buffer.toString("base64") }),
+          AVATAR_TTL,
+        );
+      }
+
+      res.header("Content-Type", contentType);
+      res.header("Cache-Control", `public, max-age=${AVATAR_TTL}, immutable`);
       res.send(buffer);
     } catch (error) {
       console.error("Avatar proxy error:", error);
