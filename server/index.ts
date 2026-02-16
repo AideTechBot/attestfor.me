@@ -4,6 +4,10 @@ import fastifyStatic from "@fastify/static";
 import fs from "fs";
 import path from "path";
 import { setupApp } from "./app-setup";
+import { initializeOAuthClient } from "./oauth";
+
+// Initialize OAuth client
+initializeOAuthClient();
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;

@@ -1,0 +1,62 @@
+{
+  "lexicon": 1,
+  "id": "me.attest.proof",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A proof of ownership of an external account or identity.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["service", "handle", "proofUrl", "nonce", "status", "createdAt"],
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Canonical service identifier (e.g., 'twitter', 'github').",
+            "knownValues": [
+              "twitter",
+              "github"
+            ]
+          },
+          "handle": {
+            "type": "string",
+            "description": "The user's handle/username on the external service or wallet address.",
+            "maxGraphemes": 512
+          },
+          "proofUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL where the proof text can be found (tweet URL, gist URL, etc.).",
+            "maxGraphemes": 2048
+          },
+          "nonce": {
+            "type": "string",
+            "description": "Random nonce used in the proof challenge text (minimum 128 bits entropy).",
+            "maxGraphemes": 128
+          },
+          "challengeText": {
+            "type": "string",
+            "description": "The full challenge text the user posted on the external service.",
+            "maxGraphemes": 4096
+          },
+          "status": {
+            "type": "string",
+            "description": "Current status of this proof.",
+            "default": "active",
+            "enum": ["active", "retracted"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "ISO 8601 timestamp when this proof was created."
+          },
+          "retractedAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "Optional: ISO 8601 timestamp when this proof was retracted."
+          }
+        }
+      }
+    }
+  }
+}

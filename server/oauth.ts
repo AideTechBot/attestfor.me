@@ -1,6 +1,21 @@
-import type { OAuthClientMetadata } from "@atproto/oauth-client-node";
-import { NodeOAuthClient } from "@atproto/oauth-client-node";
-import { JoseKey } from "@atproto/jwk-jose";
+import {
+  OAuthClient,
+  MemoryStore,
+  type StoredState,
+  type StoredSession,
+  type OAuthSession,
+  type Store,
+} from "@atcute/oauth-node-client";
+import {
+  LocalActorResolver,
+  CompositeHandleResolver,
+  CompositeDidDocumentResolver,
+  PlcDidDocumentResolver,
+  WebDidDocumentResolver,
+  WellKnownHandleResolver,
+} from "@atcute/identity-resolver";
+import { NodeDnsHandleResolver } from "@atcute/identity-resolver-node";
+import type { Did } from "@atcute/lexicons/syntax";
 import { store } from "./storage";
 import clientMetadataJson from "../public/oauth/client-metadata.json";
 
@@ -30,42 +45,77 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await store.del(`session:${sessionId}`);
 }
 
-const privateKey = await JoseKey.generate();
-const clientMetadata = clientMetadataJson as unknown as OAuthClientMetadata;
+/**
+ * Create a Store<K,V> adapter backed by our Redis/in-memory store.
+ * The @atcute Store interface uses: get, set, delete, clear
+ */
+function createStoreAdapter<K extends string, V>(
+  prefix: string,
+  ttlSeconds?: number,
+): Store<K, V> {
+  return {
+    async get(key: K): Promise<V | undefined> {
+      const data = await store.get(`${prefix}${key}`);
+      return data ? JSON.parse(data) : undefined;
+    },
+    async set(key: K, value: V): Promise<void> {
+      await store.set(`${prefix}${key}`, JSON.stringify(value), ttlSeconds);
+    },
+    async delete(key: K): Promise<void> {
+      await store.del(`${prefix}${key}`);
+    },
+    async clear(): Promise<void> {
+      // Not easily implementable with Redis key-prefix store,
+      // but @atcute only calls this for cleanup on shutdown
+    },
+  };
+}
 
-export const oauthClient = new NodeOAuthClient({
-  clientMetadata,
-  keyset: [privateKey],
-  // Default resolver uses AT Protocol standard resolution:
-  // DNS TXT (_atproto.<handle>) + HTTP well-known (https://<handle>/.well-known/atproto-did)
-  stateStore: {
-    async set(key, internalState) {
-      // OAuth state (PKCE verifiers, etc.) - short TTL
-      await store.set(`oauth:state:${key}`, JSON.stringify(internalState), 600); // 10 minutes
+let oauthClient: OAuthClient;
+
+export function initializeOAuthClient(): OAuthClient {
+  if (oauthClient) {
+    return oauthClient;
+  }
+
+  oauthClient = new OAuthClient({
+    metadata: {
+      client_id: clientMetadataJson.client_id,
+      redirect_uris: clientMetadataJson.redirect_uris as [string, ...string[]],
+      scope: clientMetadataJson.scope,
     },
-    async get(key) {
-      const data = await store.get(`oauth:state:${key}`);
-      return data ? JSON.parse(data) : undefined;
+    // No keyset — this is a public client (token_endpoint_auth_method: "none")
+
+    actorResolver: new LocalActorResolver({
+      handleResolver: new CompositeHandleResolver({
+        methods: {
+          dns: new NodeDnsHandleResolver(),
+          http: new WellKnownHandleResolver(),
+        },
+      }),
+      didDocumentResolver: new CompositeDidDocumentResolver({
+        methods: {
+          plc: new PlcDidDocumentResolver(),
+          web: new WebDidDocumentResolver(),
+        },
+      }),
+    }),
+
+    stores: {
+      sessions: createStoreAdapter<Did, StoredSession>(
+        "oauth:session:",
+        60 * 60 * 24 * 30, // 30 days
+      ),
+      states: new MemoryStore<string, StoredState>({
+        maxSize: 1000,
+        ttl: 10 * 60 * 1000, // 10 minutes
+        ttlAutopurge: true,
+      }),
     },
-    async del(key) {
-      await store.del(`oauth:state:${key}`);
-    },
-  },
-  sessionStore: {
-    async set(sub, session) {
-      // OAuth session (tokens, DPoP keys, etc.)
-      await store.set(
-        `oauth:session:${sub}`,
-        JSON.stringify(session),
-        60 * 60 * 24 * 30,
-      ); // 30 days
-    },
-    async get(sub) {
-      const data = await store.get(`oauth:session:${sub}`);
-      return data ? JSON.parse(data) : undefined;
-    },
-    async del(sub) {
-      await store.del(`oauth:session:${sub}`);
-    },
-  },
-});
+  });
+
+  return oauthClient;
+}
+
+export { oauthClient };
+export type { OAuthSession };

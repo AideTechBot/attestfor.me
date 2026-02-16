@@ -14,16 +14,24 @@
     "build": "tsc -b && pnpm run build:client && pnpm run build:server",
     "start": "node dist/server/index.js",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
     "update-oauth-url": "tsx scripts/update-oauth-url.ts",
+    "generate:types": "lex-cli generate",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint"
   },
   "dependencies": {
-    "@atproto/jwk-jose": "^0.1.11",
-    "@atproto/oauth-client-node": "^0.3.16",
+    "@atcute/atproto": "^3.1.10",
+    "@atcute/client": "^4.2.1",
+    "@atcute/identity-resolver": "^1.2.2",
+    "@atcute/identity-resolver-node": "^1.0.3",
+    "@atcute/lexicons": "^1.2.9",
+    "@atcute/oauth-node-client": "^1.1.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/express": "^4.0.4",
     "@fastify/static": "^9.0.0",
@@ -43,6 +51,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@atcute/lex-cli": "^2.5.3",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^24.10.1",
@@ -56,10 +65,10 @@
     "globals": "^16.5.0",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.1.18",
-    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.0.18"
   }
 }

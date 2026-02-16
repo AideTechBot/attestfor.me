@@ -3,8 +3,11 @@ import { oauthClient, getSession, setSession, deleteSession } from "./oauth";
 import { store } from "./storage";
 import { SESSION_PROFILE_TTL } from "./cache-ttl";
 import { SESSION_COOKIE_NAME } from "../src/lib/constants";
+import { setupProofsRoutes } from "./routes/proofs";
+import { setupKeysRoutes } from "./routes/keys";
 
 import type { FastifyInstance } from "fastify";
+import type { Handle } from "@atcute/lexicons";
 
 // Classify authentication errors into user-friendly error codes
 function classifyAuthError(error: unknown): string {
@@ -75,7 +78,7 @@ export async function setupApp(app: FastifyInstance) {
     );
 
     try {
-      const handle = (req.query as { handle?: string }).handle;
+      const handle = (req.query as { handle?: Handle }).handle;
 
       if (!handle) {
         return res.redirect(`${returnTo}?auth_error=missing_handle`);
@@ -85,12 +88,16 @@ export async function setupApp(app: FastifyInstance) {
       const stateId = crypto.randomUUID();
       await store.set(`oauth:returnTo:${stateId}`, returnTo, 600); // 10 minutes
 
-      const authUrl = await oauthClient.authorize(handle, {
+      const authUrl = await oauthClient.authorize({
+        target: {
+          type: "account",
+          identifier: handle,
+        },
         scope: "atproto transition:generic",
         state: stateId,
       });
 
-      res.redirect(authUrl.toString());
+      res.redirect(authUrl.url.toString());
     } catch (error) {
       console.error("Login error:", error);
       const errorCode = classifyAuthError(error);
@@ -103,32 +110,41 @@ export async function setupApp(app: FastifyInstance) {
 
     try {
       const params = new URLSearchParams(req.url.split("?")[1]);
-      const stateId = params.get("state");
-
-      // Retrieve returnTo URL from state
-      if (stateId) {
-        const storedReturnTo = await store.get(`oauth:returnTo:${stateId}`);
-        if (storedReturnTo) {
-          returnTo = sanitizeReturnTo(storedReturnTo);
-          await store.del(`oauth:returnTo:${stateId}`);
-        }
-      }
 
       // Handle OAuth errors from provider
       const error = params.get("error");
       if (error) {
+        // Try to get returnTo from state before we lose it
+        const stateId = params.get("state");
+        if (stateId) {
+          const storedReturnTo = await store.get(`oauth:returnTo:${stateId}`);
+          if (storedReturnTo) {
+            returnTo = sanitizeReturnTo(storedReturnTo);
+            await store.del(`oauth:returnTo:${stateId}`);
+          }
+        }
+
         console.error("OAuth error:", error, params.get("error_description"));
         const errorCode =
           error === "access_denied" ? "access_denied" : "auth_failed";
         return res.redirect(`${returnTo}?auth_error=${errorCode}`);
       }
 
-      const { session } = await oauthClient.callback(params);
+      const { session, state: userState } = await oauthClient.callback(params);
+
+      // Retrieve returnTo from user state passed through OAuth flow
+      if (userState && typeof userState === "string") {
+        const storedReturnTo = await store.get(`oauth:returnTo:${userState}`);
+        if (storedReturnTo) {
+          returnTo = sanitizeReturnTo(storedReturnTo);
+          await store.del(`oauth:returnTo:${userState}`);
+        }
+      }
 
       // Store session with cookie
       const sessionId = crypto.randomUUID();
       await setSession(sessionId, {
-        did: session.sub,
+        did: session.did,
       });
 
       res.setCookie(SESSION_COOKIE_NAME, sessionId, {
@@ -139,7 +155,7 @@ export async function setupApp(app: FastifyInstance) {
         path: "/",
       });
 
-      console.log(`[Auth] User ${session.sub} authenticated successfully`);
+      console.log(`[Auth] User ${session.did} authenticated successfully`);
 
       // Redirect to original page with success indicator
       res.type("text/html").send(`
@@ -188,12 +204,8 @@ export async function setupApp(app: FastifyInstance) {
     }
 
     try {
-      const oauthSession = await oauthClient.restore(sessionData.did);
-      if (!oauthSession) {
-        await deleteSession(sessionId);
-        res.clearCookie(SESSION_COOKIE_NAME);
-        return res.send({ authenticated: false });
-      }
+      // restore() throws if session is invalid/expired
+      await oauthClient.restore(sessionData.did as `did:${string}:${string}`);
 
       // Check cache for session profile data
       const sessionCacheKey = `sessionProfile:${sessionData.did}`;
@@ -227,4 +239,9 @@ export async function setupApp(app: FastifyInstance) {
       res.send({ authenticated: false });
     }
   });
+
+  // ── API routes ─────────────────────────────────────────────────
+
+  await setupProofsRoutes(app);
+  await setupKeysRoutes(app);
 }

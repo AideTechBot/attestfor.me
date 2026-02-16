@@ -2,10 +2,14 @@ import "dotenv/config";
 import Fastify from "fastify";
 import fastifyExpress from "@fastify/express";
 import { setupApp } from "./app-setup";
+import { initializeOAuthClient } from "./oauth";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import type { ViteDevServer } from "vite";
+
+// Initialize OAuth client
+initializeOAuthClient();
 
 const app = Fastify();
 const PORT = Number(process.env.PORT) || 3000;

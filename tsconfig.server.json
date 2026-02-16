@@ -5,7 +5,7 @@
     "outDir": "dist",
     "rootDir": ".",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "target": "ES2023",
     "lib": ["ES2023"],
     "types": ["node"],
