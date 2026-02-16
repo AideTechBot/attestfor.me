@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-export function useNetworkStatus() {
-  // Start with actual browser state if available, otherwise true for SSR
-  const [isOnline, setIsOnline] = useState(() =>
-    typeof navigator !== "undefined" ? navigator.onLine : true,
+export function useNetworkStatus(): boolean | null {
+  const [isOnline, setIsOnline] = useState<boolean | null>(
+    // If navigator.onLine doesn't exist then we are online lol
+    () => navigator.onLine ?? true,
   );
 
   useEffect(() => {
