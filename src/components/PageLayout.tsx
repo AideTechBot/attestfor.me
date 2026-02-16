@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { User, ExternalLink, X } from "lucide-react";
 import { useNavigate, useLocation, Link, Outlet } from "react-router";
+import { Toaster } from "sonner";
+import { checkAuthErrorParams } from "@/lib/error-handler";
+import { OfflineIndicator } from "./OfflineIndicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,10 +56,12 @@ export function PageLayout({ children }: PageLayoutProps) {
   const [searchValue, setSearchValue] = useState("");
   const [loginHandle, setLoginHandle] = useState("");
   const [showLoginInput, setShowLoginInput] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [session, setSession] = useState<SessionData>({ authenticated: false });
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const { results: suggestions, loading: suggestionsLoading } =
     useAtprotoSearch(searchValue, searchFocused);
@@ -137,15 +142,32 @@ export function PageLayout({ children }: PageLayoutProps) {
     return () => ro.disconnect();
   }, [isHomePage]);
 
+  // Mount the Toaster on first render
+  useEffect(() => {
+    // intentionally ignored
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  // Check for auth error params after Toaster has mounted
+  useEffect(() => {
+    if (mounted) {
+      checkAuthErrorParams();
+    }
+  }, [mounted]);
+
   const handleLogin = () => {
     if (!loginHandle.trim()) {
       return;
     }
-    window.location.href = `/api/auth/login?handle=${encodeURIComponent(loginHandle)}`;
+    setIsLoggingIn(true);
+    const returnTo = encodeURIComponent(location.pathname);
+    window.location.href = `/api/auth/login?handle=${encodeURIComponent(loginHandle)}&returnTo=${returnTo}`;
   };
 
   const handleLogout = () => {
-    window.location.href = "/api/auth/logout";
+    const returnTo = encodeURIComponent(location.pathname);
+    window.location.href = `/api/auth/logout?returnTo=${returnTo}`;
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -343,9 +365,36 @@ export function PageLayout({ children }: PageLayoutProps) {
                       />
                       <button
                         onClick={handleLogin}
-                        className="w-full px-4 py-3 sm:py-2 bg-accent text-white text-base sm:text-sm hover:bg-accent-hover transition-colors"
+                        disabled={!loginHandle.trim() || isLoggingIn}
+                        className="w-full px-4 py-3 sm:py-2 bg-accent text-white text-base sm:text-sm hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent flex items-center justify-center gap-2"
                       >
-                        Continue
+                        {isLoggingIn ? (
+                          <>
+                            <svg
+                              className="animate-spin h-4 w-4"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            <span>Signing in...</span>
+                          </>
+                        ) : (
+                          "Continue"
+                        )}
                       </button>
                     </div>
                   )}
@@ -390,6 +439,29 @@ export function PageLayout({ children }: PageLayoutProps) {
           </span>
         ))}
       </footer>
+
+      <OfflineIndicator />
+      {mounted && (
+        <Toaster
+          position="bottom-center"
+          closeButton
+          toastOptions={{
+            unstyled: true,
+            classNames: {
+              toast: "toast-base",
+              error: "toast-error",
+              success: "toast-success",
+              warning: "toast-warning",
+              info: "toast-info",
+              title: "toast-title",
+              description: "toast-description",
+              actionButton: "toast-action",
+              closeButton: "toast-close",
+              icon: "toast-icon",
+            },
+          }}
+        />
+      )}
     </div>
   );
 }
