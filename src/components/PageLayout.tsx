@@ -20,6 +20,7 @@ import { HeaderAvatar } from "./HeaderAvatar";
 import { useSessionHint } from "@/lib/session-hint";
 import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
+import { thumbnailAvatar } from "@/lib/bsky";
 import "./search-animated.css";
 
 interface PageLayoutProps {
@@ -299,7 +300,7 @@ export function PageLayout({ children }: PageLayoutProps) {
               ) : session.authenticated && session.avatar ? (
                 <HeaderAvatar
                   key={session.avatar}
-                  src={`${session.avatar}&size=thumbnail`}
+                  src={thumbnailAvatar(session.avatar) || session.avatar}
                   alt={session.displayName || session.handle || ""}
                 />
               ) : (

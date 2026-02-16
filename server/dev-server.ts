@@ -102,11 +102,15 @@ app.get("/*", async (req, res) => {
 
     const { html, notFound, hasSession } = result;
 
-    // Inject the session hint so client hydration matches SSR output
-    const hasSessionScript = `<script>window.__HAS_SESSION__=${hasSession ? "true" : "false"}</script>`;
+    // Inject runtime data so client hydration has session hint immediately
+    const injectScript = [
+      `<script>`,
+      `window.__HAS_SESSION__=${hasSession ? "true" : "false"};`,
+      `</script>`,
+    ].join("");
     const htmlWithApp = template
       .replace("<!--app-html-->", html)
-      .replace('<div id="root">', hasSessionScript + '<div id="root">');
+      .replace('<div id="root">', injectScript + '<div id="root">');
 
     if (notFound) {
       res.status(404);

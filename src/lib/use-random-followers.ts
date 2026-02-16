@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { getFollows } from "./bsky";
+
 import type { AtprotoActor } from "./use-atproto-search";
 
 const PICK_COUNT = 5;
-const FOLLOWERS_FETCH_LIMIT = 50; // Fetch a decent pool to randomize from
+const FOLLOWERS_FETCH_LIMIT = 50;
 
 /**
- * Fetches followers for the given handle via the server-side AT Protocol proxy,
+ * Fetches follows for the given handle via the Bluesky public API,
  * then picks `PICK_COUNT` random ones. Results are cached so that
  * re-focusing the search bar doesn't re-fetch or re-shuffle.
  */
@@ -23,25 +25,8 @@ export function useRandomFollowers(handle: string | undefined) {
 
     const controller = new AbortController();
 
-    fetch(
-      `/api/atproto/followers?actor=${encodeURIComponent(handle)}&limit=${FOLLOWERS_FETCH_LIMIT}`,
-      { signal: controller.signal },
-    )
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Followers fetch failed: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        const all: AtprotoActor[] = (data.followers ?? []).map(
-          (f: { handle: string; displayName?: string; avatar?: string }) => ({
-            handle: f.handle,
-            displayName: f.displayName,
-            avatar: f.avatar,
-          }),
-        );
-
+    getFollows(handle, FOLLOWERS_FETCH_LIMIT, controller.signal)
+      .then((all) => {
         // Shuffle and pick random subset
         const shuffled = all.sort(() => Math.random() - 0.5);
         setFollowers(shuffled.slice(0, PICK_COUNT));

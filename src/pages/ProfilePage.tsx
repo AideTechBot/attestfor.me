@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
-import { getApiBase } from "@/lib/get-api-base";
 import { NotFoundContent } from "./NotFoundPage";
+import { getProfile } from "@/lib/bsky";
 
 interface ProfileData {
   handle: string;
@@ -15,7 +15,6 @@ interface ProfileData {
 // eslint-disable-next-line react-refresh/only-export-components
 export async function profileLoader({
   params,
-  request,
 }: LoaderFunctionArgs): Promise<ProfileData> {
   const handle = params.handle;
 
@@ -36,27 +35,18 @@ export async function profileLoader({
   }
 
   try {
-    const apiBase = getApiBase(request);
-    const res = await fetch(
-      `${apiBase}/api/atproto/profile?actor=${encodeURIComponent(cleanHandle)}`,
-    );
-
-    if (!res.ok) {
+    // Same code runs on both server (SSR) and client (navigation).
+    // getProfile calls the Bluesky public API directly.
+    const profile = await getProfile(cleanHandle);
+    if (!profile) {
       return { handle: cleanHandle, isValid: false };
     }
 
-    const data = (await res.json()) as {
-      handle: string;
-      displayName?: string;
-      description?: string;
-      avatar?: string;
-    };
-
     return {
-      handle: data.handle,
-      displayName: data.displayName,
-      description: data.description,
-      avatar: data.avatar,
+      handle: profile.handle,
+      displayName: profile.displayName,
+      description: profile.description,
+      avatar: profile.avatar,
       isValid: true,
     };
   } catch (error) {
@@ -80,7 +70,7 @@ export function ProfilePage() {
         {profile.avatar ? (
           <AvatarWithShimmer
             key={profile.avatar}
-            src={`${profile.avatar}&size=avatar`}
+            src={profile.avatar}
             alt={profile.displayName || profile.handle}
           />
         ) : (

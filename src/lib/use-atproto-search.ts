@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { searchActors } from "./bsky";
+import type { BskyActor } from "./bsky";
 
-export interface AtprotoActor {
-  handle: string;
-  displayName?: string;
-  avatar?: string;
-}
+export type AtprotoActor = BskyActor;
 
 const DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 5;
@@ -28,24 +26,8 @@ export function useAtprotoSearch(query: string, enabled: boolean) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      fetch(
-        `/api/atproto/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_LIMIT}`,
-        { signal: controller.signal },
-      )
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Search failed: ${res.status}`);
-          }
-          return res.json();
-        })
-        .then((data) => {
-          const actors: AtprotoActor[] = (data.actors ?? []).map(
-            (a: { handle: string; displayName?: string; avatar?: string }) => ({
-              handle: a.handle,
-              displayName: a.displayName,
-              avatar: a.avatar,
-            }),
-          );
+      searchActors(trimmed, SEARCH_LIMIT, controller.signal)
+        .then((actors) => {
           setResults(actors);
           setFetchedQuery(trimmed);
         })

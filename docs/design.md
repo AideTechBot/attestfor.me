@@ -727,6 +727,73 @@ src/
 - **Key parsing**: Use libraries like `openpgp` (for PGP) and custom parsers for SSH/age/etc.
 - **No separate database needed**: All data lives in AT Proto repos. The server is stateless — it only verifies and proxies writes.
 
+### 6.3.1 Coding Conventions
+
+These conventions **must** be followed by all contributors and AI agents working on the codebase.
+
+#### Shared Types — No Duplication
+
+Types and interfaces used by **both** the server (`server/`) and the client (`src/`) **must** live in the `types/` directory at the project root. Never duplicate a type across server and client files.
+
+```
+types/
+  config.ts     ← ClientConfig, RequestMode, ClientDirectOperations
+  index.ts      ← InitialState (and future shared types)
+```
+
+Both `tsconfig.app.json` (client) and `tsconfig.server.json` (server) can resolve imports from `types/`. Example import from either side:
+
+```typescript
+import type { ClientConfig } from "../../types/config";   // from src/lib/
+import type { ClientConfig } from "../types/config";       // from server/
+```
+
+When adding a new type that both sides need, add it to `types/` — not to `src/` or `server/`.
+
+#### SSR-Injected Runtime Data — Use `window.__*__`, Not Fetch
+
+Any data the client needs on first render that is known at SSR time **must** be injected into the HTML via `window` globals inside a `<script>` tag — not fetched from an API endpoint after load. This avoids an extra round-trip, eliminates a flash of default state, and keeps hydration synchronous.
+
+**Pattern (server side — `server/dev-server.ts` and production equivalent):**
+
+```typescript
+const injectScript = [
+  `<script>`,
+  `window.__HAS_SESSION__=${hasSession ? "true" : "false"};`,
+  `window.__CLIENT_CONFIG__=${getClientConfigScript()};`,
+  `</script>`,
+].join("");
+
+const html = template
+  .replace("<!--app-html-->", appHtml)
+  .replace('<div id="root">', injectScript + '<div id="root">');
+```
+
+**Pattern (client side — read synchronously, no async init):**
+
+```typescript
+// src/lib/client-config.ts
+export function getConfig(): ClientConfig {
+  if (typeof window !== "undefined" && window.__CLIENT_CONFIG__) {
+    return window.__CLIENT_CONFIG__ as ClientConfig;
+  }
+  return DEFAULT_CONFIG; // fallback for SSR render pass
+}
+```
+
+**Checklist for adding a new `window.__*__` value:**
+
+1. Declare it in `src/global.d.ts` on the `Window` interface.
+2. Build it on the server and add it to the inject script.
+3. Read it synchronously on the client — no `await`, no `fetch`.
+
+Existing injected values:
+
+| Variable | Purpose |
+|---|---|
+| `window.__HAS_SESSION__` | Whether the user has an active session cookie |
+| `window.__CLIENT_CONFIG__` | Request-routing mode & API URLs (see `types/config.ts`) |
+
 ### 6.4 State Management Strategy
 
 **Recommendation: Start with React Context + TanStack Query, add Redux only if needed**

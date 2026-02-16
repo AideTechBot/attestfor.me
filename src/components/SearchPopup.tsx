@@ -1,5 +1,6 @@
 import { X, Loader2 } from "lucide-react";
 import type { AtprotoActor } from "@/lib/use-atproto-search";
+import { thumbnailAvatar } from "@/lib/bsky";
 
 interface SearchPopupProps {
   visible: boolean;
@@ -83,7 +84,7 @@ export function SearchPopup({
             >
               {actor.avatar ? (
                 <img
-                  src={`${actor.avatar}&size=thumbnail`}
+                  src={thumbnailAvatar(actor.avatar)}
                   alt=""
                   className="w-6 h-6 object-cover shrink-0"
                 />
@@ -123,7 +124,7 @@ export function SearchPopup({
             >
               {actor.avatar ? (
                 <img
-                  src={`${actor.avatar}&size=thumbnail`}
+                  src={thumbnailAvatar(actor.avatar)}
                   alt=""
                   className="w-6 h-6 object-cover shrink-0"
                 />

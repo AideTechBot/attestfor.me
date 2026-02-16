@@ -13,6 +13,6 @@
     "allowImportingTsExtensions": false,
     "declaration": true
   },
-  "include": ["server/**/*"],
-  "exclude": ["node_modules", "dist", "src", "types"]
+  "include": ["server/**/*", "types/**/*"],
+  "exclude": ["node_modules", "dist", "src"]
 }
