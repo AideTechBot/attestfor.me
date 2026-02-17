@@ -3,8 +3,7 @@ import { oauthClient, getSession, setSession, deleteSession } from "./oauth";
 import { store } from "./storage";
 import { SESSION_PROFILE_TTL } from "./cache-ttl";
 import { SESSION_COOKIE_NAME } from "../src/lib/constants";
-import { setupProofsRoutes } from "./routes/proofs";
-import { setupKeysRoutes } from "./routes/keys";
+import { proxyTwitterGraphQL } from "./routes/twitter-proxy";
 
 import type { FastifyInstance } from "fastify";
 import type { Handle } from "@atcute/lexicons";
@@ -242,6 +241,5 @@ export async function setupApp(app: FastifyInstance) {
 
   // ── API routes ─────────────────────────────────────────────────
 
-  await setupProofsRoutes(app);
-  await setupKeysRoutes(app);
+  app.get("/api/twitter/tweet", proxyTwitterGraphQL);
 }
