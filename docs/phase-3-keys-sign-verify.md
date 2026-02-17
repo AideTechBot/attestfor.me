@@ -1,1070 +1,826 @@
-# Phase 3: Public Keys + Sign & Verify — Detailed Implementation Guide
+# Phase 3: Public Keys + Sign & Verify — Implementation Guide
 
-**Objective:** Implement public key upload, parsing, fingerprint extraction for PGP/SSH/age/minisign/signify/WireGuard, build the key fetch API (like GitHub's `/username.keys`), and create an in-browser sign & verify tool.
+**Objective:** Implement authenticated AT Proto writes (the critical missing piece from Phase 2), client-side key parsing and upload for PGP/SSH/age/minisign/signify/WireGuard, and an in-browser PGP sign & verify tool.
 
 **Prerequisites:**
-- Phase 1 completed (lexicons, challenge generation, AT Proto repo library)
-- Phase 2 completed (proof verification, wallet proofs)
+- Phase 1 completed (lexicons, OAuth, server infrastructure)
+- Phase 2 completed (client-side proof verification, Twitter proxy, client-side AT Proto reads)
 
 ---
 
-## Task 3.1: Key Parser Library
+## Architecture Principles (from Phase 2)
+
+1. **Thin server** — The server only handles OAuth session management and proxies requests that the browser cannot make directly
+2. **Client-side logic** — All parsing, validation, and verification runs in the browser
+3. **Server as auth proxy** — The only reason to add server routes is when the browser lacks the credentials (DPoP keys + OAuth tokens live server-side)
+4. **Public reads are client-side** — `src/lib/atproto.ts` already reads from the public Bluesky XRPC API with no auth
+
+### Why Authenticated Writes Need the Server
+
+The app uses `@atcute/oauth-node-client` for server-side OAuth. When a user logs in:
+
+1. The DPoP key pair + access/refresh tokens are stored server-side in Redis/in-memory (`server/storage.ts`)
+2. The browser only receives a session cookie (random UUID → DID mapping)
+3. To write to the user's PDS, the server must call `oauthClient.restore(did)` to reconstruct the `OAuthSession` with the stored DPoP key, then make DPoP-signed XRPC calls
+
+The browser cannot make authenticated PDS requests because it has no DPoP private key or access tokens.
+
+---
+
+## Task 3.1: Authenticated Write Proxy Routes
 
 ### Location
-Create file: `server/lib/key-parser.ts`
+Create file: `server/routes/repo-proxy.ts`
+Update file: `server/app-setup.ts` (register routes)
+
+### Overview
+
+Two generic, thin proxy endpoints that authenticate via session cookie and forward writes to the user's PDS. No business logic, no validation — just auth + proxy. This follows the same pattern as `server/routes/twitter-proxy.ts`.
+
+These routes unblock **all** record creation across the app — keys (Phase 3), proofs (Phase 2 gap), and statements (future).
+
+### Implementation: `server/routes/repo-proxy.ts`
+
+```typescript
+import type { FastifyInstance } from "fastify";
+import { Client } from "@atcute/client";
+import { oauthClient, getSession } from "../oauth";
+import { SESSION_COOKIE_NAME } from "../../src/lib/constants";
+import type { Did } from "@atcute/lexicons";
+
+export async function registerRepoProxy(app: FastifyInstance) {
+  /**
+   * POST /api/repo/createRecord
+   * Create a record in the authenticated user's AT Proto repository.
+   *
+   * Body: { collection: string, record: object, rkey?: string }
+   * Returns: { uri: string, cid: string }
+   */
+  app.post("/api/repo/createRecord", async (req, res) => {
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
+    if (!sessionId) {
+      return res.status(401).send({ error: "Not authenticated" });
+    }
+
+    const sessionData = await getSession(sessionId);
+    if (!sessionData) {
+      return res.status(401).send({ error: "Session expired" });
+    }
+
+    const { collection, record, rkey } = req.body as {
+      collection: string;
+      record: Record<string, unknown>;
+      rkey?: string;
+    };
+
+    if (!collection || !record) {
+      return res
+        .status(400)
+        .send({ error: "Missing required fields: collection, record" });
+    }
+
+    try {
+      const session = await oauthClient.restore(sessionData.did as Did);
+      const client = new Client({ handler: session });
+
+      const result = await client.post("com.atproto.repo.createRecord", {
+        input: {
+          repo: sessionData.did,
+          collection,
+          rkey,
+          record,
+        },
+      });
+
+      return res.send({
+        uri: result.data.uri,
+        cid: result.data.cid,
+      });
+    } catch (error: unknown) {
+      console.error("[repo-proxy] createRecord error:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return res
+        .status(500)
+        .send({ error: "Failed to create record", message });
+    }
+  });
+
+  /**
+   * POST /api/repo/deleteRecord
+   * Delete a record from the authenticated user's AT Proto repository.
+   *
+   * Body: { collection: string, rkey: string }
+   */
+  app.post("/api/repo/deleteRecord", async (req, res) => {
+    const sessionId = req.cookies[SESSION_COOKIE_NAME];
+    if (!sessionId) {
+      return res.status(401).send({ error: "Not authenticated" });
+    }
+
+    const sessionData = await getSession(sessionId);
+    if (!sessionData) {
+      return res.status(401).send({ error: "Session expired" });
+    }
+
+    const { collection, rkey } = req.body as {
+      collection: string;
+      rkey: string;
+    };
+
+    if (!collection || !rkey) {
+      return res
+        .status(400)
+        .send({ error: "Missing required fields: collection, rkey" });
+    }
+
+    try {
+      const session = await oauthClient.restore(sessionData.did as Did);
+      const client = new Client({ handler: session });
+
+      await client.post("com.atproto.repo.deleteRecord", {
+        input: {
+          repo: sessionData.did,
+          collection,
+          rkey,
+        },
+      });
+
+      return res.send({ success: true });
+    } catch (error: unknown) {
+      console.error("[repo-proxy] deleteRecord error:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return res
+        .status(500)
+        .send({ error: "Failed to delete record", message });
+    }
+  });
+}
+```
+
+### Registration in `server/app-setup.ts`
+
+Add to the existing `setupApp` function, alongside the Twitter proxy registration:
+
+```typescript
+import { registerRepoProxy } from "./routes/repo-proxy";
+
+// Inside setupApp(), after the Twitter proxy line:
+await registerRepoProxy(app);
+```
+
+### Tests: `server/routes/repo-proxy.test.ts`
+
+- Mock `oauthClient.restore()` to return a fake `OAuthSession`
+- Mock `Client.post()` to capture XRPC calls
+- Test: returns 401 when no session cookie
+- Test: returns 401 when session expired
+- Test: returns 400 when missing collection/record
+- Test: proxies createRecord with correct repo/collection/record
+- Test: proxies deleteRecord with correct repo/collection/rkey
+- Test: returns 500 with error message on PDS failure
+
+---
+
+## Task 3.2: Client-Side Write Helpers
+
+### Location
+Update file: `src/lib/atproto.ts`
+
+### Overview
+
+Add client-side functions that call the server write proxy endpoints. These complement the existing public read functions in `src/lib/atproto.ts`.
 
 ### Implementation
 
+Add to the existing `src/lib/atproto.ts`:
+
 ```typescript
-import * as openpgp from 'openpgp';
-import { createHash } from 'crypto';
+// ── Authenticated writes (via server proxy) ────────────────────────
+
+/**
+ * Create a record in the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
+ */
+export async function createRecord(
+  collection: string,
+  record: Record<string, unknown>,
+  rkey?: string,
+): Promise<{ uri: string; cid: string }> {
+  const response = await fetch("/api/repo/createRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, record, rkey }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a record from the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
+ */
+export async function deleteRecord(
+  collection: string,
+  rkey: string,
+): Promise<void> {
+  const response = await fetch("/api/repo/deleteRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, rkey }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+}
+
+// ── Key-specific helpers ───────────────────────────────────────────
+
+import type { MeAttestKey } from "../../types/lexicons";
+
+const KEY_COLLECTION = "me.attest.key";
+
+/**
+ * List all keys for a DID (public, no auth)
+ */
+export async function listKeys(
+  did: string,
+): Promise<AtProtoRecord<MeAttestKey.Main>[]> {
+  const result = await listRecords<MeAttestKey.Main>(did, KEY_COLLECTION);
+  return result.records;
+}
+
+/**
+ * Get a single key by rkey (public, no auth)
+ */
+export async function getKey(
+  did: string,
+  rkey: string,
+): Promise<AtProtoRecord<MeAttestKey.Main>> {
+  return getRecord<MeAttestKey.Main>(did, KEY_COLLECTION, rkey);
+}
+
+/**
+ * Publish a key to the authenticated user's repo (via server proxy)
+ */
+export async function publishKey(
+  record: MeAttestKey.Main,
+): Promise<{ uri: string; cid: string }> {
+  return createRecord(
+    KEY_COLLECTION,
+    record as unknown as Record<string, unknown>,
+  );
+}
+
+/**
+ * Delete a key from the authenticated user's repo (via server proxy)
+ */
+export async function deleteKey(rkey: string): Promise<void> {
+  return deleteRecord(KEY_COLLECTION, rkey);
+}
+
+/**
+ * Publish a proof to the authenticated user's repo (via server proxy).
+ * (Unblocks the Phase 2 gap — proof creation was not wired up)
+ */
+export async function publishProof(
+  record: MeAttestProof.Main,
+): Promise<{ uri: string; cid: string }> {
+  return createRecord(
+    PROOF_COLLECTION,
+    record as unknown as Record<string, unknown>,
+  );
+}
+
+/**
+ * Delete a proof from the authenticated user's repo (via server proxy)
+ */
+export async function deleteProof(rkey: string): Promise<void> {
+  return deleteRecord(PROOF_COLLECTION, rkey);
+}
+```
+
+---
+
+## Task 3.3: Client-Side Key Parser
+
+### Location
+Create file: `src/lib/key-parser.ts`
+
+### Overview
+
+Pure client-side key parsing and fingerprint extraction. No server involvement. Uses Web Crypto API (`crypto.subtle`) for SSH fingerprint hashing — **not** Node.js `crypto`. Uses `openpgp` (browser build) for PGP key parsing.
+
+### Supported Key Types
+
+From the `me.attest.key` lexicon `keyType` field:
+
+| Type | `keyType` value | Fingerprint method |
+|------|----------------|-------------------|
+| PGP/GPG | `pgp` | 40-char hex via openpgp |
+| SSH Ed25519 | `ssh-ed25519` | `SHA256:{base64}` via Web Crypto |
+| SSH ECDSA | `ssh-ecdsa` | `SHA256:{base64}` via Web Crypto |
+| SSH RSA | `ssh-rsa` | `SHA256:{base64}` via Web Crypto |
+| age | `age` | The key itself (self-identifying) |
+| minisign | `minisign` | First 12 chars of key data |
+| signify | `signify` | First 16 chars of key data |
+| WireGuard | `wireguard` | The key itself (44 base64 chars) |
+
+### Implementation: `src/lib/key-parser.ts`
+
+```typescript
+import * as openpgp from "openpgp";
 
 export interface ParsedKey {
-  type: string;
+  keyType: string;
   fingerprint: string;
   publicKey: string;
   comment?: string;
   expiresAt?: string;
-  keyId?: string;
   algorithm?: string;
 }
 
 /**
- * Parse and extract fingerprint from a PGP public key
+ * SHA256 fingerprint using Web Crypto API (browser-compatible).
+ */
+async function sha256Fingerprint(data: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(hash)));
+  return `SHA256:${base64}`;
+}
+
+/**
+ * Parse and extract fingerprint from a PGP public key.
  */
 export async function parsePGPKey(armoredKey: string): Promise<ParsedKey> {
-  try {
-    const key = await openpgp.readKey({ armoredKey });
+  const key = await openpgp.readKey({ armoredKey });
 
-    const fingerprint = key.getFingerprint().toUpperCase();
-    const keyId = key.getKeyID().toHex().toUpperCase();
-    const creationTime = key.getCreationTime();
-    
-    // Check for expiration
-    const expirationTime = await key.getExpirationTime();
-    const expiresAt = expirationTime ? expirationTime.toISOString() : undefined;
+  const fingerprint = key.getFingerprint().toUpperCase();
+  const expirationTime = await key.getExpirationTime();
+  const expiresAt =
+    expirationTime instanceof Date ? expirationTime.toISOString() : undefined;
 
-    // Get primary user ID
-    const user = await key.getPrimaryUser();
-    const comment = user?.user?.userID?.name || user?.user?.userID?.email;
+  const user = await key.getPrimaryUser();
+  const comment =
+    user?.user?.userID?.name || user?.user?.userID?.email || undefined;
 
-    return {
-      type: 'pgp',
-      fingerprint,
-      publicKey: armoredKey.trim(),
-      keyId,
-      comment,
-      expiresAt,
-      algorithm: key.getAlgorithmInfo().algorithm,
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse PGP key: ${error.message}`);
-  }
+  return {
+    keyType: "pgp",
+    fingerprint,
+    publicKey: armoredKey.trim(),
+    comment,
+    expiresAt,
+    algorithm: key.getAlgorithmInfo().algorithm,
+  };
 }
 
 /**
- * Parse and extract fingerprint from an SSH public key
+ * Parse and extract fingerprint from an SSH public key.
  */
-export function parseSSHKey(sshKey: string): ParsedKey {
-  try {
-    const trimmed = sshKey.trim();
-    const parts = trimmed.split(/\s+/);
+export async function parseSSHKey(sshKey: string): Promise<ParsedKey> {
+  const trimmed = sshKey.trim();
+  const parts = trimmed.split(/\s+/);
 
-    if (parts.length < 2) {
-      throw new Error('Invalid SSH key format');
-    }
-
-    const [algorithm, keyData, ...commentParts] = parts;
-    const comment = commentParts.join(' ') || undefined;
-
-    // Validate algorithm
-    const validAlgorithms = [
-      'ssh-rsa',
-      'ssh-ed25519',
-      'ecdsa-sha2-nistp256',
-      'ecdsa-sha2-nistp384',
-      'ecdsa-sha2-nistp521',
-      'ssh-dss',
-    ];
-
-    if (!validAlgorithms.includes(algorithm)) {
-      throw new Error(`Unsupported SSH key algorithm: ${algorithm}`);
-    }
-
-    // Calculate SHA256 fingerprint
-    const keyBuffer = Buffer.from(keyData, 'base64');
-    const hash = createHash('sha256').update(keyBuffer).digest('base64');
-    const fingerprint = `SHA256:${hash}`;
-
-    // Determine key type
-    let keyType: string;
-    if (algorithm === 'ssh-rsa') {
-      keyType = 'ssh-rsa';
-    } else if (algorithm === 'ssh-ed25519') {
-      keyType = 'ssh-ed25519';
-    } else if (algorithm.startsWith('ecdsa')) {
-      keyType = 'ssh-ecdsa';
-    } else {
-      keyType = 'ssh';
-    }
-
-    return {
-      type: keyType,
-      fingerprint,
-      publicKey: trimmed,
-      comment,
-      algorithm,
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse SSH key: ${error.message}`);
+  if (parts.length < 2) {
+    throw new Error("Invalid SSH key format");
   }
+
+  const [algorithm, keyData, ...commentParts] = parts;
+  const comment = commentParts.join(" ") || undefined;
+
+  const validAlgorithms = [
+    "ssh-rsa",
+    "ssh-ed25519",
+    "ecdsa-sha2-nistp256",
+    "ecdsa-sha2-nistp384",
+    "ecdsa-sha2-nistp521",
+  ];
+
+  if (!validAlgorithms.includes(algorithm)) {
+    throw new Error(`Unsupported SSH key algorithm: ${algorithm}`);
+  }
+
+  // Decode base64 key data and compute SHA256 fingerprint via Web Crypto
+  const binaryString = atob(keyData);
+  const keyBuffer = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    keyBuffer[i] = binaryString.charCodeAt(i);
+  }
+  const fingerprint = await sha256Fingerprint(keyBuffer);
+
+  // Map to keyType values matching the lexicon
+  let keyType: string;
+  if (algorithm === "ssh-rsa") {
+    keyType = "ssh-rsa";
+  } else if (algorithm === "ssh-ed25519") {
+    keyType = "ssh-ed25519";
+  } else {
+    keyType = "ssh-ecdsa";
+  }
+
+  return {
+    keyType,
+    fingerprint,
+    publicKey: trimmed,
+    comment,
+    algorithm,
+  };
 }
 
 /**
- * Parse an age public key
+ * Parse an age public key.
  */
 export function parseAgeKey(ageKey: string): ParsedKey {
-  try {
-    const trimmed = ageKey.trim();
+  const trimmed = ageKey.trim();
 
-    // Age key format: age1{58 base64 characters}
-    const pattern = /^age1[a-z0-9]{58}$/;
-    if (!pattern.test(trimmed)) {
-      throw new Error('Invalid age key format');
-    }
-
-    // Age keys are self-identifying, use the key itself as fingerprint
-    const fingerprint = trimmed;
-
-    return {
-      type: 'age',
-      fingerprint,
-      publicKey: trimmed,
-      algorithm: 'X25519',
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse age key: ${error.message}`);
+  // age1 followed by 58 bech32 characters
+  if (!/^age1[a-z0-9]{58}$/.test(trimmed)) {
+    throw new Error("Invalid age key format");
   }
+
+  return {
+    keyType: "age",
+    fingerprint: trimmed,
+    publicKey: trimmed,
+    algorithm: "X25519",
+  };
 }
 
 /**
- * Parse a minisign public key
+ * Parse a minisign public key.
  */
 export function parseMinisignKey(minisignKey: string): ParsedKey {
-  try {
-    const lines = minisignKey.trim().split('\n');
-
-    if (lines.length < 2) {
-      throw new Error('Invalid minisign key format');
-    }
-
-    // First line should be "untrusted comment: ..."
-    // Second line is the actual key
-    const keyLine = lines[lines.length - 1];
-
-    if (!keyLine || keyLine.length < 40) {
-      throw new Error('Invalid minisign key data');
-    }
-
-    // Extract key ID (first 8 bytes base64-encoded from the key)
-    const fingerprint = keyLine.substring(0, 12);
-
-    return {
-      type: 'minisign',
-      fingerprint,
-      publicKey: minisignKey.trim(),
-      comment: lines[0].replace(/^untrusted comment:\s*/, ''),
-      algorithm: 'Ed25519',
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse minisign key: ${error.message}`);
+  const lines = minisignKey.trim().split("\n");
+  if (lines.length < 2) {
+    throw new Error("Invalid minisign key format");
   }
+
+  const keyLine = lines[lines.length - 1];
+  if (!keyLine || keyLine.length < 40) {
+    throw new Error("Invalid minisign key data");
+  }
+
+  return {
+    keyType: "minisign",
+    fingerprint: keyLine.substring(0, 12),
+    publicKey: minisignKey.trim(),
+    comment: lines[0].replace(/^untrusted comment:\s*/, ""),
+    algorithm: "Ed25519",
+  };
 }
 
 /**
- * Parse a signify public key (OpenBSD)
+ * Parse a signify public key (OpenBSD).
  */
 export function parseSignifyKey(signifyKey: string): ParsedKey {
-  try {
-    const lines = signifyKey.trim().split('\n');
-
-    if (lines.length < 2) {
-      throw new Error('Invalid signify key format');
-    }
-
-    // First line is comment, second line is base64 key
-    const comment = lines[0].replace(/^untrusted comment:\s*/, '');
-    const keyData = lines[1];
-
-    if (!keyData || keyData.length < 40) {
-      throw new Error('Invalid signify key data');
-    }
-
-    // Use first 12 chars as fingerprint
-    const fingerprint = keyData.substring(0, 16);
-
-    return {
-      type: 'signify',
-      fingerprint,
-      publicKey: signifyKey.trim(),
-      comment,
-      algorithm: 'Ed25519',
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse signify key: ${error.message}`);
+  const lines = signifyKey.trim().split("\n");
+  if (lines.length < 2) {
+    throw new Error("Invalid signify key format");
   }
+
+  const keyData = lines[1];
+  if (!keyData || keyData.length < 40) {
+    throw new Error("Invalid signify key data");
+  }
+
+  return {
+    keyType: "signify",
+    fingerprint: keyData.substring(0, 16),
+    publicKey: signifyKey.trim(),
+    comment: lines[0].replace(/^untrusted comment:\s*/, ""),
+    algorithm: "Ed25519",
+  };
 }
 
 /**
- * Parse a WireGuard public key
+ * Parse a WireGuard public key.
  */
 export function parseWireGuardKey(wgKey: string): ParsedKey {
-  try {
-    const trimmed = wgKey.trim();
+  const trimmed = wgKey.trim();
 
-    // WireGuard key: 44 base64 characters
-    const pattern = /^[A-Za-z0-9+\/]{42}[A-Za-z0-9+\/=]{2}$/;
-    if (!pattern.test(trimmed)) {
-      throw new Error('Invalid WireGuard key format');
-    }
-
-    // Use the key itself as fingerprint (it's already unique)
-    const fingerprint = trimmed;
-
-    return {
-      type: 'wireguard',
-      fingerprint,
-      publicKey: trimmed,
-      algorithm: 'Curve25519',
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to parse WireGuard key: ${error.message}`);
+  // WireGuard key: 44 base64 characters (32 bytes = 43 chars + 1 padding)
+  if (!/^[A-Za-z0-9+/]{42}[A-Za-z0-9+/=]{2}$/.test(trimmed)) {
+    throw new Error("Invalid WireGuard key format");
   }
+
+  return {
+    keyType: "wireguard",
+    fingerprint: trimmed,
+    publicKey: trimmed,
+    algorithm: "Curve25519",
+  };
 }
 
 /**
- * Auto-detect and parse any supported key type
+ * Auto-detect and parse any supported key type.
  */
 export async function parseKey(keyData: string): Promise<ParsedKey> {
   const trimmed = keyData.trim();
 
-  // Try to detect key type
-  if (trimmed.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
-    return await parsePGPKey(trimmed);
-  } else if (trimmed.startsWith('ssh-') || trimmed.startsWith('ecdsa-')) {
+  if (trimmed.includes("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
+    return parsePGPKey(trimmed);
+  }
+  if (trimmed.startsWith("ssh-") || trimmed.startsWith("ecdsa-")) {
     return parseSSHKey(trimmed);
-  } else if (trimmed.startsWith('age1')) {
+  }
+  if (trimmed.startsWith("age1")) {
     return parseAgeKey(trimmed);
-  } else if (trimmed.includes('untrusted comment') && trimmed.includes('minisign')) {
+  }
+  if (trimmed.includes("untrusted comment") && trimmed.includes("minisign")) {
     return parseMinisignKey(trimmed);
-  } else if (trimmed.includes('untrusted comment')) {
+  }
+  if (trimmed.includes("untrusted comment")) {
     return parseSignifyKey(trimmed);
-  } else if (/^[A-Za-z0-9+\/]{43}=$/.test(trimmed)) {
-    // Likely WireGuard (44 base64 chars with padding)
+  }
+  if (/^[A-Za-z0-9+/]{42}[A-Za-z0-9+/=]{2}$/.test(trimmed)) {
     return parseWireGuardKey(trimmed);
   }
 
-  throw new Error('Unknown key format. Supported: PGP, SSH, age, minisign, signify, WireGuard');
+  throw new Error(
+    "Unknown key format. Supported: PGP, SSH, age, minisign, signify, WireGuard",
+  );
 }
 ```
 
-**Dependencies:**
+### Dependencies
+
 ```bash
-npm install openpgp
+pnpm add openpgp
 ```
 
-**Test file:** `server/lib/key-parser.test.ts`
+`openpgp` is a **client dependency** (it ships a browser-compatible build). It is used for:
+- PGP key parsing and fingerprint extraction (Task 3.3)
+- PGP message signing and signature verification (Task 3.6)
 
-```typescript
-import { describe, it, expect } from 'vitest';
-import { parsePGPKey, parseSSHKey, parseAgeKey, parseKey } from './key-parser';
+### Tests: `src/lib/key-parser.test.ts`
 
-describe('Key Parser', () => {
-  describe('parseSSHKey', () => {
-    it('should parse ssh-ed25519 key', () => {
-      const key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN8h8P4fL7H3qE0l8fJKXZQV5V3bK7P5LxvJ8hKy9p8K alice@laptop';
-      const result = parseSSHKey(key);
-
-      expect(result.type).toBe('ssh-ed25519');
-      expect(result.fingerprint).toMatch(/^SHA256:/);
-      expect(result.comment).toBe('alice@laptop');
-      expect(result.algorithm).toBe('ssh-ed25519');
-    });
-
-    it('should parse ssh-rsa key', () => {
-      const key =
-        'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7... user@host';
-      const result = parseSSHKey(key);
-
-      expect(result.type).toBe('ssh-rsa');
-      expect(result.fingerprint).toMatch(/^SHA256:/);
-    });
-
-    it('should throw on invalid key', () => {
-      expect(() => parseSSHKey('not a key')).toThrow();
-    });
-  });
-
-  describe('parseAgeKey', () => {
-    it('should parse valid age key', () => {
-      const key = 'age1zvkyg2lqzraa2lnjvqej32nkuu0uesxnz1e4e8m2e8jl0e8e8jl0e8e';
-      const result = parseAgeKey(key);
-
-      expect(result.type).toBe('age');
-      expect(result.fingerprint).toBe(key);
-      expect(result.algorithm).toBe('X25519');
-    });
-
-    it('should throw on invalid age key', () => {
-      expect(() => parseAgeKey('age1short')).toThrow();
-    });
-  });
-
-  describe('parseKey (auto-detect)', () => {
-    it('should auto-detect SSH key', async () => {
-      const key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN8h8P4fL7H3qE0l8fJKXZQV5V3bK7P5LxvJ8hKy9p8K comment';
-      const result = await parseKey(key);
-
-      expect(result.type).toBe('ssh-ed25519');
-    });
-
-    it('should auto-detect age key', async () => {
-      const key = 'age1zvkyg2lqzraa2lnjvqej32nkuu0uesxnz1e4e8m2e8jl0e8e8jl0e8e';
-      const result = await parseKey(key);
-
-      expect(result.type).toBe('age');
-    });
-  });
-});
-```
+- Test `parseSSHKey` with ed25519, RSA, ECDSA keys
+- Test `parseSSHKey` throws on invalid format
+- Test `parsePGPKey` extracts fingerprint and comment (mock openpgp)
+- Test `parseAgeKey` with valid key and rejects invalid
+- Test `parseMinisignKey` extracts comment and fingerprint
+- Test `parseSignifyKey` extracts comment and fingerprint
+- Test `parseWireGuardKey` with valid 44-char key and rejects invalid
+- Test `parseKey` auto-detects all supported types
+- All tests mock `crypto.subtle.digest` for SSH fingerprinting (Web Crypto API)
 
 ---
 
-## Task 3.2: Key Upload API Route
+## Task 3.4: Lexicon Update
 
 ### Location
-Update file: `server/routes/keys.ts`
+Update file: `lexicons/me/attest/key.json`
 
-### Implementation
+### Change
 
-Replace the placeholder `POST /` endpoint:
+Add missing key types to `knownValues`. The `keyType` field is a `string` (not an enum), so unknown values are already accepted — `knownValues` is just documentation of expected values.
 
-```typescript
-import { parseKey } from '../lib/key-parser';
+```diff
+  "knownValues": [
+    "pgp",
+    "ssh-ed25519",
+-   "ssh-ecdsa"
++   "ssh-ecdsa",
++   "ssh-rsa",
++   "age",
++   "minisign",
++   "signify",
++   "wireguard"
+  ]
+```
 
-/**
- * POST /api/keys
- * Publish a new public key
- */
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const session = getSessionFromRequest(req);
-    if (!session) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+After updating, regenerate types:
 
-    const { publicKey, label, comment } = req.body;
-
-    if (!publicKey) {
-      return res.status(400).json({ error: 'Missing required field: publicKey' });
-    }
-
-    // Parse and validate the key
-    let parsed;
-    try {
-      parsed = await parseKey(publicKey);
-    } catch (error: any) {
-      return res.status(400).json({
-        error: 'Invalid key format',
-        message: error.message,
-      });
-    }
-
-    // Create key record
-    const agent = new AtpAgent({ service: session.pdsUrl });
-    agent.session = session;
-
-    const keyRecord = {
-      keyType: parsed.type,
-      fingerprint: parsed.fingerprint,
-      publicKey: parsed.publicKey,
-      label: label || undefined,
-      comment: comment || parsed.comment || undefined,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    };
-
-    const result = await createRecord(
-      { agent, did: session.did },
-      'me.attest.key',
-      keyRecord
-    );
-
-    res.json({
-      success: true,
-      uri: result.uri,
-      cid: result.cid,
-      key: keyRecord,
-      parsed,
-    });
-  } catch (error: any) {
-    console.error('Error publishing key:', error);
-    res.status(500).json({
-      error: 'Failed to publish key',
-      message: error.message,
-    });
-  }
-});
+```bash
+pnpm generate:types
 ```
 
 ---
 
-## Task 3.3: Key Fetch API Endpoints
-
-### Location
-Update file: `server/routes/keys.ts`
-
-Add these new endpoints:
-
-```typescript
-/**
- * GET /api/keys/:identifier/ssh
- * Fetch SSH public keys in OpenSSH format (like GitHub's /username.keys)
- * @param identifier - DID or handle (e.g., @alice.bsky.social)
- */
-router.get('/:identifier/ssh', async (req: Request, res: Response) => {
-  try {
-    const { identifier } = req.params;
-
-    // Resolve identifier to DID
-    let did: string;
-    if (identifier.startsWith('did:')) {
-      did = identifier;
-    } else {
-      // Handle format: @alice.bsky.social or alice.bsky.social
-      const handle = identifier.replace(/^@/, '');
-      const agent = new AtpAgent({ service: 'https://bsky.social' });
-      
-      try {
-        const resolved = await agent.resolveHandle({ handle });
-        did = resolved.data.did;
-      } catch (error) {
-        return res.status(404).json({ error: 'Handle not found' });
-      }
-    }
-
-    // Fetch all keys for this DID
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-    const result = await listRecords(agent, did, 'me.attest.key', 100);
-
-    // Filter for SSH keys with status 'active'
-    const sshKeys = result.records
-      .filter((r: any) =>
-        ['ssh-rsa', 'ssh-ed25519', 'ssh-ecdsa'].includes(r.value.keyType) &&
-        r.value.status === 'active'
-      )
-      .map((r: any) => r.value.publicKey);
-
-    if (sshKeys.length === 0) {
-      return res.status(404).send('# No SSH keys found\n');
-    }
-
-    // Return as plain text, one key per line
-    res.contentType('text/plain');
-    res.send(sshKeys.join('\n') + '\n');
-  } catch (error: any) {
-    console.error('Error fetching SSH keys:', error);
-    res.status(500).send(`# Error fetching SSH keys: ${error.message}\n`);
-  }
-});
-
-/**
- * GET /api/keys/:identifier/pgp
- * Fetch PGP public keys in ASCII-armored format
- */
-router.get('/:identifier/pgp', async (req: Request, res: Response) => {
-  try {
-    const { identifier } = req.params;
-
-    // Resolve identifier to DID
-    let did: string;
-    if (identifier.startsWith('did:')) {
-      did = identifier;
-    } else {
-      const handle = identifier.replace(/^@/, '');
-      const agent = new AtpAgent({ service: 'https://bsky.social' });
-      
-      try {
-        const resolved = await agent.resolveHandle({ handle });
-        did = resolved.data.did;
-      } catch (error) {
-        return res.status(404).text('<!-- Handle not found -->');
-      }
-    }
-
-    // Fetch all keys for this DID
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-    const result = await listRecords(agent, did, 'me.attest.key', 100);
-
-    // Filter for PGP keys with status 'active'
-    const pgpKeys = result.records
-      .filter((r: any) => r.value.keyType === 'pgp' && r.value.status === 'active')
-      .map((r: any) => r.value.publicKey);
-
-    if (pgpKeys.length === 0) {
-      return res.status(404).send('<!-- No PGP keys found -->\n');
-    }
-
-    // Return as plain text, keys separated by newlines
-    res.contentType('text/plain');
-    res.send(pgpKeys.join('\n\n') + '\n');
-  } catch (error: any) {
-    console.error('Error fetching PGP keys:', error);
-    res.status(500).send(`<!-- Error fetching PGP keys: ${error.message} -->\n`);
-  }
-});
-
-/**
- * GET /api/keys/:identifier/all
- * Fetch all public keys in structured JSON format
- */
-router.get('/:identifier/all', async (req: Request, res: Response) => {
-  try {
-    const { identifier } = req.params;
-
-    // Resolve identifier to DID
-    let did: string;
-    if (identifier.startsWith('did:')) {
-      did = identifier;
-    } else {
-      const handle = identifier.replace(/^@/, '');
-      const agent = new AtpAgent({ service: 'https://bsky.social' });
-      
-      try {
-        const resolved = await agent.resolveHandle({ handle });
-        did = resolved.data.did;
-      } catch (error) {
-        return res.status(404).json({ error: 'Handle not found' });
-      }
-    }
-
-    // Fetch all keys for this DID
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-    const result = await listRecords(agent, did, 'me.attest.key', 100);
-
-    // Filter for active keys
-    const keys = result.records
-      .filter((r: any) => r.value.status === 'active')
-      .map((r: any) => ({
-        uri: r.uri,
-        keyType: r.value.keyType,
-        fingerprint: r.value.fingerprint,
-        publicKey: r.value.publicKey,
-        label: r.value.label,
-        comment: r.value.comment,
-        createdAt: r.value.createdAt,
-        expiresAt: r.value.expiresAt,
-      }));
-
-    res.json({
-      did,
-      keys,
-      count: keys.length,
-    });
-  } catch (error: any) {
-    console.error('Error fetching keys:', error);
-    res.status(500).json({
-      error: 'Failed to fetch keys',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * GET /:handle.keys
- * Shorthand for SSH keys (like GitHub)
- */
-router.get('/:handle.keys', async (req: Request, res: Response) => {
-  // Redirect to /api/keys/:handle/ssh
-  const { handle } = req.params;
-  req.params.identifier = handle;
-  return router.handle(req, res);
-});
-```
-
----
-
-## Task 3.4: Frontend - Key Upload Component
+## Task 3.5: Key Upload Component
 
 ### Location
 Create file: `src/components/KeyUpload.tsx`
 
-### Implementation
+### Overview
+
+Client-side component that:
+1. Accepts a public key via paste or file upload
+2. Auto-detects the key type using `parseKey()` from `src/lib/key-parser.ts`
+3. Shows detected type and extracted fingerprint
+4. Publishes the key to the user's AT Proto repo via `publishKey()` from `src/lib/atproto.ts`
+
+All parsing runs in the browser. The only network call is the final `publishKey()` which goes through the server write proxy.
+
+### Implementation sketch
 
 ```typescript
-import React, { useState } from 'react';
+import { useState } from "react";
+import { parseKey, type ParsedKey } from "@/lib/key-parser";
+import { publishKey } from "@/lib/atproto";
 
 interface KeyUploadProps {
-  onSuccess: (keyData: any) => void;
+  onSuccess: (uri: string, cid: string) => void;
 }
 
 export function KeyUpload({ onSuccess }: KeyUploadProps) {
-  const [publicKey, setPublicKey] = useState('');
-  const [label, setLabel] = useState('');
-  const [comment, setComment] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const [publicKey, setPublicKey] = useState("");
+  const [label, setLabel] = useState("");
+  const [parsed, setParsed] = useState<ParsedKey | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [keyType, setKeyType] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const detectKeyType = (key: string): string | null => {
-    const trimmed = key.trim();
-    if (trimmed.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) return 'PGP';
-    if (trimmed.startsWith('ssh-rsa')) return 'SSH RSA';
-    if (trimmed.startsWith('ssh-ed25519')) return 'SSH Ed25519';
-    if (trimmed.startsWith('ecdsa')) return 'SSH ECDSA';
-    if (trimmed.startsWith('age1')) return 'age';
-    if (trimmed.includes('minisign')) return 'minisign';
-    if (trimmed.includes('untrusted comment')) return 'signify';
-    if (/^[A-Za-z0-9+\/]{43}=$/.test(trimmed)) return 'WireGuard';
-    return null;
-  };
-
-  const handleKeyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const key = e.target.value;
-    setPublicKey(key);
-    setKeyType(detectKeyType(key));
+  const handleKeyChange = async (value: string) => {
+    setPublicKey(value);
     setError(null);
-  };
+    setParsed(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setUploading(true);
+    if (!value.trim()) return;
 
     try {
-      const response = await fetch('/api/keys', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          publicKey,
-          label: label || undefined,
-          comment: comment || undefined,
-        }),
+      const result = await parseKey(value);
+      setParsed(result);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid key");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!parsed) return;
+    setUploading(true);
+    setError(null);
+
+    try {
+      const { uri, cid } = await publishKey({
+        keyType: parsed.keyType,
+        fingerprint: parsed.fingerprint,
+        publicKey: parsed.publicKey,
+        label: label || undefined,
+        comment: parsed.comment,
+        expiresAt: parsed.expiresAt,
+        status: "active",
+        createdAt: new Date().toISOString(),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || data.error || 'Failed to upload key');
-      }
-
-      const data = await response.json();
-      onSuccess(data);
-
-      // Reset form
-      setPublicKey('');
-      setLabel('');
-      setComment('');
-      setKeyType(null);
-    } catch (err: any) {
-      setError(err.message);
+      onSuccess(uri, cid);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
   };
 
-  const loadFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    try {
-      const text = await file.text();
-      setPublicKey(text);
-      setKeyType(detectKeyType(text));
-      
-      // Try to extract a label from the filename
-      const filename = file.name.replace(/\.(pub|key|txt|asc)$/i, '');
-      if (filename && !label) {
-        setLabel(filename);
-      }
-    } catch (err: any) {
-      setError(`Failed to read file: ${err.message}`);
-    }
+    const text = await file.text();
+    await handleKeyChange(text);
   };
 
-  return (
-    <div className="key-upload">
-      <h2>Upload Public Key</h2>
-
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="publicKey">Public Key *</label>
-          <textarea
-            id="publicKey"
-            value={publicKey}
-            onChange={handleKeyChange}
-            placeholder="Paste your public key here (PGP, SSH, age, minisign, signify, or WireGuard)"
-            rows={10}
-            required
-            style={{ fontFamily: 'monospace', fontSize: '0.9em' }}
-          />
-          
-          {keyType && (
-            <div className="key-type-detected" style={{ marginTop: '0.5rem', color: '#0066cc' }}>
-              ✓ Detected: {keyType}
-            </div>
-          )}
-
-          <div style={{ marginTop: '0.5rem' }}>
-            <label className="btn-secondary" style={{ cursor: 'pointer' }}>
-              Load from file
-              <input
-                type="file"
-                onChange={loadFromFile}
-                accept=".pub,.key,.txt,.asc"
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="label">Label (optional)</label>
-          <input
-            type="text"
-            id="label"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g., 'work laptop', 'signing key'"
-            maxLength={128}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="comment">Comment (optional)</label>
-          <input
-            type="text"
-            id="comment"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Additional notes about this key"
-            maxLength={512}
-          />
-        </div>
-
-        {error && (
-          <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-
-        <button type="submit" disabled={uploading || !publicKey} className="btn-primary">
-          {uploading ? 'Uploading...' : 'Upload Key'}
-        </button>
-      </form>
-
-      <div className="help-section" style={{ marginTop: '2rem', fontSize: '0.9em', color: '#666' }}>
-        <h3>Supported Key Types</h3>
-        <ul>
-          <li><strong>PGP/GPG:</strong> ASCII-armored public key (starts with -----BEGIN PGP PUBLIC KEY BLOCK-----)</li>
-          <li><strong>SSH:</strong> OpenSSH format (ssh-rsa, ssh-ed25519, ecdsa-sha2-nistp256, etc.)</li>
-          <li><strong>age:</strong> Modern encryption key (starts with age1)</li>
-          <li><strong>minisign:</strong> Signature verification key</li>
-          <li><strong>signify:</strong> OpenBSD signature key</li>
-          <li><strong>WireGuard:</strong> VPN public key (44 base64 characters)</li>
-        </ul>
-
-        <h3>How to export your public keys</h3>
-        <ul>
-          <li><strong>SSH:</strong> <code>cat ~/.ssh/id_ed25519.pub</code></li>
-          <li><strong>PGP:</strong> <code>gpg --armor --export your@email.com</code></li>
-          <li><strong>age:</strong> <code>age-keygen -y ~/.age-key.txt</code></li>
-          <li><strong>WireGuard:</strong> <code>wg show wg0 public-key</code></li>
-        </ul>
-      </div>
-    </div>
-  );
+  // ... render form with textarea, file input, label input,
+  //     detected type badge, fingerprint display, submit button
 }
 ```
 
 ---
 
-## Task 3.5: In-Browser Sign & Verify
+## Task 3.6: In-Browser PGP Sign & Verify
 
 ### Location
-Create files in `src/pages/SignVerifyPage.tsx` and components in `src/components/SignVerify/`
+Create files:
+- `src/pages/SignVerifyPage.tsx`
+- `src/components/SignVerify/SignForm.tsx`
+- `src/components/SignVerify/VerifyForm.tsx`
 
-### File: `src/pages/SignVerifyPage.tsx`
+Update file: `src/routes.tsx` (add `/sign-verify` route)
+
+### Overview
+
+Entirely client-side PGP signing and verification using `openpgp`. The private key **never leaves the browser** and is **never sent to the server**.
+
+### Sign Flow
+
+1. User types a message
+2. User pastes their PGP private key (+ passphrase if encrypted)
+3. Client-side `openpgp.sign()` produces a cleartext-signed message
+4. Output displayed for copying
+
+### Verify Flow
+
+1. User pastes a PGP cleartext-signed message
+2. User provides or the app fetches the signer's public key:
+   - Option A: Paste the public key manually
+   - Option B: Enter a DID/handle → app calls `listKeys()` from `src/lib/atproto.ts` to fetch their published PGP keys (public read, no auth)
+3. Client-side `openpgp.verify()` checks the signature
+4. Result displayed: valid/invalid, signer info, fingerprint match
+
+### Route Registration
+
+Add to `src/routes.tsx`:
 
 ```typescript
-import React, { useState } from 'react';
-import { SignForm } from '../components/SignVerify/SignForm';
-import { VerifyForm } from '../components/SignVerify/VerifyForm';
+import { SignVerifyPage } from "./pages/SignVerifyPage";
 
-export function SignVerifyPage() {
-  const [activeTab, setActiveTab] = useState<'sign' | 'verify'>('sign');
-
-  return (
-    <div className="sign-verify-page">
-      <h1>Sign & Verify Messages</h1>
-      <p>
-        Sign messages with your published keys or verify signed messages from others.
-      </p>
-
-      <div className="tabs">
-        <button
-          className={activeTab === 'sign' ? 'active' : ''}
-          onClick={() => setActiveTab('sign')}
-        >
-          Sign
-        </button>
-        <button
-          className={activeTab === 'verify' ? 'active' : ''}
-          onClick={() => setActiveTab('verify')}
-        >
-          Verify
-        </button>
-      </div>
-
-      <div className="tab-content">
-        {activeTab === 'sign' ? <SignForm /> : <VerifyForm />}
-      </div>
-    </div>
-  );
+// In the routes array, inside the PageLayout children:
+{
+  path: "/sign-verify",
+  element: <SignVerifyPage />,
 }
 ```
 
-### File: `src/components/SignVerify/SignForm.tsx`
+### Implementation: `src/components/SignVerify/SignForm.tsx`
 
 ```typescript
-import React, { useState, useEffect } from 'react';
-import * as openpgp from 'openpgp';
+import { useState } from "react";
+import * as openpgp from "openpgp";
 
 export function SignForm() {
-  const [message, setMessage] = useState('');
-  const [privateKey, setPrivateKey] = useState('');
-  const [passphrase, setPassphrase] = useState('');
-  const [signing, setSigning] = useState(false);
-  const [signedMessage, setSignedMessage] = useState('');
+  const [message, setMessage] = useState("");
+  const [privateKey, setPrivateKey] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [signedMessage, setSignedMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [userKeys, setUserKeys] = useState<any[]>([]);
-  const [selectedKeyUri, setSelectedKeyUri] = useState('');
-
-  useEffect(() => {
-    // Fetch user's published keys
-    fetch('/api/keys/me', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => {
-        setUserKeys(data.keys || []);
-      })
-      .catch((err) => {
-        console.error('Failed to load keys:', err);
-      });
-  }, []);
+  const [signing, setSigning] = useState(false);
 
   const handleSign = async () => {
-    if (!message || !privateKey) {
-      setError('Please provide both a message and your private key');
-      return;
-    }
-
     setSigning(true);
     setError(null);
-    setSignedMessage('');
 
     try {
-      // Parse private key
-      const key = await openpgp.readPrivateKey({ armoredKey: privateKey });
-
-      // Decrypt private key if encrypted
-      let decryptedKey = key;
-      if (key.isEncrypted() && passphrase) {
-        decryptedKey = await openpgp.decryptKey({
-          privateKey: key,
-          passphrase,
-        });
-      } else if (key.isEncrypted()) {
-        throw new Error('Private key is encrypted but no passphrase provided');
+      let key = await openpgp.readPrivateKey({ armoredKey: privateKey });
+      if (key.isEncrypted()) {
+        if (!passphrase)
+          throw new Error("Key is encrypted — passphrase required");
+        key = await openpgp.decryptKey({ privateKey: key, passphrase });
       }
 
-      // Sign the message
       const signed = await openpgp.sign({
-        message: await openpgp.createMessage({ text: message }),
-        signingKeys: decryptedKey,
+        message: await openpgp.createCleartextMessage({ text: message }),
+        signingKeys: key,
       });
 
-      // Get public key fingerprint
-      const publicKey = decryptedKey.toPublic();
-      const fingerprint = publicKey.getFingerprint();
-
-      // Find matching published key
-      const matchingKey = userKeys.find((k) =>
-        k.fingerprint?.toUpperCase() === fingerprint.toUpperCase()
-      );
-
-      const did = matchingKey ? 'YOUR_DID' : 'unknown'; // Replace with actual DID from session
-
-      // Format output
-      const output = `-----BEGIN ATTESTFOR.ME SIGNED MESSAGE-----
-Signer: ${did}
-Key: PGP ${fingerprint}
-${matchingKey?.label ? `Label: ${matchingKey.label}` : ''}
-Date: ${new Date().toISOString()}
-
-${message}
-
-${signed}
------END ATTESTFOR.ME SIGNED MESSAGE-----`;
-
-      setSignedMessage(output);
-    } catch (err: any) {
-      setError(`Signing failed: ${err.message}`);
+      setSignedMessage(signed as string);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Signing failed");
     } finally {
       setSigning(false);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(signedMessage);
-  };
-
-  return (
-    <div className="sign-form">
-      <h2>Sign a Message</h2>
-
-      <div className="form-group">
-        <label>Message to Sign</label>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Enter the message you want to sign..."
-          rows={6}
-        />
-      </div>
-
-      <div className="form-group">
-        <label>Your Private Key</label>
-        <textarea
-          value={privateKey}
-          onChange={(e) => setPrivateKey(e.target.value)}
-          placeholder="Paste your PGP private key here (it never leaves your browser)"
-          rows={8}
-          style={{ fontFamily: 'monospace', fontSize: '0.85em' }}
-        />
-        <small style={{ color: '#666' }}>
-          Your private key is processed entirely in your browser and is never sent to the server.
-        </small>
-      </div>
-
-      <div className="form-group">
-        <label>Passphrase (if key is encrypted)</label>
-        <input
-          type="password"
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-          placeholder="Enter passphrase if needed"
-        />
-      </div>
-
-      {error && (
-        <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
-          {error}
-        </div>
-      )}
-
-      <button onClick={handleSign} disabled={signing || !message || !privateKey} className="btn-primary">
-        {signing ? 'Signing...' : 'Sign Message'}
-      </button>
-
-      {signedMessage && (
-        <div className="signed-output" style={{ marginTop: '2rem' }}>
-          <h3>Signed Message</h3>
-          <textarea
-            value={signedMessage}
-            readOnly
-            rows={15}
-            style={{ fontFamily: 'monospace', fontSize: '0.85em', width: '100%' }}
-          />
-          <button onClick={copyToClipboard} className="btn-secondary">
-            Copy to Clipboard
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  // ... render: message textarea, private key textarea,
+  //     passphrase input, sign button, signed output + copy button
+  //     Note: "Your private key never leaves your browser"
 }
 ```
 
-### File: `src/components/SignVerify/VerifyForm.tsx`
+### Implementation: `src/components/SignVerify/VerifyForm.tsx`
 
 ```typescript
-import React, { useState } from 'react';
-import * as openpgp from 'openpgp';
+import { useState } from "react";
+import * as openpgp from "openpgp";
+import { listKeys } from "@/lib/atproto";
 
 export function VerifyForm() {
-  const [signedMessage, setSignedMessage] = useState('');
-  const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [signedMessage, setSignedMessage] = useState("");
+  const [publicKeyInput, setPublicKeyInput] = useState("");
+  const [didInput, setDidInput] = useState("");
+  const [result, setResult] = useState<{
+    valid: boolean;
+    fingerprint: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = async () => {
-    if (!signedMessage) {
-      setError('Please paste a signed message');
-      return;
-    }
-
-    setVerifying(true);
-    setError(null);
-    setResult(null);
-
     try {
-      // Parse the AttestFor.me signed message format
-      const lines = signedMessage.split('\n');
-      let did = '';
-      let fingerprint = '';
-      let messageStart = -1;
-      let signatureStart = -1;
+      let armoredPublicKey = publicKeyInput;
 
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('Signer:')) {
-          did = lines[i].replace('Signer:', '').trim();
-        } else if (lines[i].startsWith('Key: PGP')) {
-          fingerprint = lines[i].replace('Key: PGP', '').trim();
-        } else if (lines[i] === '' && messageStart === -1 && did) {
-          messageStart = i + 1;
-        } else if (lines[i].startsWith('-----BEGIN PGP SIGNATURE-----')) {
-          signatureStart = i;
-          break;
-        }
+      // If DID/handle provided, fetch their PGP keys from AT Proto
+      if (!armoredPublicKey && didInput) {
+        const keys = await listKeys(didInput);
+        const pgpKey = keys.find(
+          (k) => k.value.keyType === "pgp" && k.value.status === "active",
+        );
+        if (!pgpKey)
+          throw new Error("No active PGP key found for this identity");
+        armoredPublicKey = pgpKey.value.publicKey;
       }
 
-      if (!fingerprint) {
-        throw new Error('Could not parse signed message format');
-      }
+      if (!armoredPublicKey)
+        throw new Error("Provide a public key or DID/handle");
 
-      // Verify the PGP signature
-      const message = await openpgp.readMessage({
-        armoredMessage: lines.slice(signatureStart).join('\n'),
+      const publicKey = await openpgp.readKey({
+        armoredKey: armoredPublicKey,
       });
-
-      // Fetch the public key from AttestFor.me
-      const keysResponse = await fetch(`/api/keys/${did}/all`);
-      if (!keysResponse.ok) {
-        throw new Error('Could not fetch signer public keys');
-      }
-
-      const keysData = await keysResponse.json();
-      const matchingKey = keysData.keys.find((k: any) =>
-        k.fingerprint?.toUpperCase() === fingerprint.toUpperCase() && k.keyType === 'pgp'
-      );
-
-      if (!matchingKey) {
-        throw new Error(`No matching key found for fingerprint ${fingerprint}`);
-      }
-
-      const publicKey = await openpgp.readKey({ armoredKey: matchingKey.publicKey });
+      const message = await openpgp.readCleartextMessage({
+        cleartextMessage: signedMessage,
+      });
 
       const verification = await openpgp.verify({
         message,
@@ -1072,94 +828,134 @@ export function VerifyForm() {
       });
 
       const { verified } = verification.signatures[0];
-      await verified; // Will throw if invalid
+      await verified; // throws if invalid
 
       setResult({
         valid: true,
-        signer: did,
-        fingerprint,
-        label: matchingKey.label,
-        signedAt: lines.find((l) => l.startsWith('Date:'))?.replace('Date:', '').trim(),
+        fingerprint: publicKey.getFingerprint().toUpperCase(),
       });
-    } catch (err: any) {
-      setError(`Verification failed: ${err.message}`);
-    } finally {
-      setVerifying(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+      setResult(null);
     }
   };
 
-  return (
-    <div className="verify-form">
-      <h2>Verify a Signed Message</h2>
-
-      <div className="form-group">
-        <label>Signed Message</label>
-        <textarea
-          value={signedMessage}
-          onChange={(e) => setSignedMessage(e.target.value)}
-          placeholder="Paste the signed message here..."
-          rows={15}
-          style={{ fontFamily: 'monospace', fontSize: '0.85em' }}
-        />
-      </div>
-
-      {error && (
-        <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
-          {error}
-        </div>
-      )}
-
-      <button onClick={handleVerify} disabled={verifying || !signedMessage} className="btn-primary">
-        {verifying ? 'Verifying...' : 'Verify Signature'}
-      </button>
-
-      {result && (
-        <div className="verification-result" style={{ marginTop: '2rem', padding: '1rem', border: '2px solid #00cc00', borderRadius: '4px' }}>
-          <h3 style={{ color: '#00cc00' }}>✓ Signature Valid</h3>
-          <dl>
-            <dt>Signer:</dt>
-            <dd>{result.signer}</dd>
-            <dt>Key Fingerprint:</dt>
-            <dd style={{ fontFamily: 'monospace' }}>{result.fingerprint}</dd>
-            {result.label && (
-              <>
-                <dt>Key Label:</dt>
-                <dd>{result.label}</dd>
-              </>
-            )}
-            <dt>Signed At:</dt>
-            <dd>{result.signedAt}</dd>
-          </dl>
-        </div>
-      )}
-    </div>
-  );
+  // ... render: signed message textarea, public key textarea OR did/handle input,
+  //     verify button, result display (valid/invalid + fingerprint)
 }
 ```
 
-**Dependencies:**
-```bash
-npm install openpgp
+---
+
+## Task Order & Dependencies
+
 ```
+Task 3.1: Repo write proxy routes (server)
+  └── Task 3.2: Client-side write helpers (depends on 3.1)
+       └── Task 3.5: Key upload component (depends on 3.2, 3.3)
+
+Task 3.3: Key parser library (client, independent)
+Task 3.4: Lexicon update (independent)
+Task 3.6: Sign & verify page (depends on 3.3 for openpgp dep, 3.2 for key reads)
+```
+
+Recommended implementation order: **3.4 → 3.1 → 3.2 → 3.3 → 3.5 → 3.6**
+
+---
+
+## File Structure (New/Modified)
+
+```
+server/
+  ├── app-setup.ts                    # MODIFIED — register repo proxy routes
+  └── routes/
+      ├── twitter-proxy.ts            # existing
+      └── repo-proxy.ts               # NEW — createRecord + deleteRecord proxy
+
+src/
+  ├── lib/
+  │   ├── atproto.ts                  # MODIFIED — add write helpers + key/proof helpers
+  │   ├── key-parser.ts               # NEW — client-side key parsing
+  │   └── key-parser.test.ts          # NEW — tests
+  ├── components/
+  │   ├── KeyUpload.tsx               # NEW — key upload form
+  │   └── SignVerify/
+  │       ├── SignForm.tsx            # NEW — PGP signing
+  │       └── VerifyForm.tsx          # NEW — PGP verification
+  ├── pages/
+  │   └── SignVerifyPage.tsx          # NEW — sign/verify page
+  └── routes.tsx                      # MODIFIED — add /sign-verify route
+
+lexicons/
+  └── me/attest/key.json             # MODIFIED — add knownValues
+
+types/lexicons/types/me/attest/
+  └── key.ts                         # REGENERATED via pnpm generate:types
+```
+
+---
+
+## Test Plan
+
+| Test File | Location | Tests | Description |
+|-----------|----------|-------|-------------|
+| `server/routes/repo-proxy.test.ts` | server | ~6 | Auth validation, createRecord proxy, deleteRecord proxy, error handling |
+| `src/lib/key-parser.test.ts` | client | ~15 | All key type parsing, auto-detection, fingerprint extraction, error cases |
+
+**Existing tests** (49 passing from Phase 2) must continue to pass.
+
+**Test strategy:**
+- All tests mock `fetch` / `crypto.subtle` — no network calls
+- Server tests mock `oauthClient.restore()` and `Client`
+- Key parser tests mock `openpgp.readKey()` and `crypto.subtle.digest()`
+- Vitest with `globals: true`
+
+---
+
+## Dependencies
+
+### New
+
+| Package | Type | Purpose |
+|---------|------|---------|
+| `openpgp` | runtime (client) | PGP key parsing, signing, verification |
+
+### Existing (no changes)
+
+| Package | Purpose |
+|---------|---------|
+| `@atcute/client` | XRPC client for authenticated PDS calls (server-side, via `Client` + `OAuthSession` handler) |
+| `@atcute/oauth-node-client` | OAuth session management (server-side) |
 
 ---
 
 ## Acceptance Criteria
 
-Phase 3 is complete when:
+- [ ] `POST /api/repo/createRecord` creates records via authenticated DPoP-signed PDS requests
+- [ ] `POST /api/repo/deleteRecord` deletes records via authenticated DPoP-signed PDS requests
+- [ ] Both routes return 401 for unauthenticated requests
+- [ ] Client-side `createRecord()` / `deleteRecord()` in `src/lib/atproto.ts` call the proxy
+- [ ] Key parser supports all 7 key types (PGP, SSH Ed25519, SSH ECDSA, SSH RSA, age, minisign, signify, WireGuard)
+- [ ] Key parser uses Web Crypto API (`crypto.subtle`) for SSH fingerprints — no Node.js `crypto`
+- [ ] `parseKey()` auto-detects key type from content
+- [ ] Key upload component parses client-side, publishes via `publishKey()`
+- [ ] `me.attest.key` lexicon `knownValues` updated and types regenerated
+- [ ] PGP sign form works entirely client-side — private key never sent to server
+- [ ] PGP verify form can fetch signer's public key from AT Proto repo via `listKeys()`
+- [ ] `/sign-verify` route registered
+- [ ] All new tests pass
+- [ ] All existing Phase 2 tests (49) still pass
+- [ ] No TypeScript errors, build succeeds
 
-- [ ] Key parser library supports all key types (PGP, SSH, age, minisign, signify, WireGuard)
-- [ ] `POST /api/keys` endpoint parses and validates keys correctly
-- [ ] Key fingerprint extraction works for all key types
-- [ ] `GET /api/keys/:identifier/ssh` returns SSH keys in OpenSSH format
-- [ ] `GET /api/keys/:identifier/pgp` returns PGP keys in ASCII-armored format
-- [ ] `GET /api/keys/:identifier/all` returns all keys in JSON format
-- [ ] Key upload component in frontend works and auto-detects key types
-- [ ] Sign form allows users to sign messages with PGP private keys (client-side only)
-- [ ] Verify form validates signed messages and fetches signer's public key from repo
-- [ ] All unit tests pass with >80% coverage
-- [ ] Key fetch API can be used with `curl` and SSH `AuthorizedKeysCommand`
-- [ ] Documentation is complete for all new endpoints
+---
+
+## Known Limitations
+
+1. **Only PGP signing/verifying** — SSH, age, minisign, signify, WireGuard signing is out of scope for Phase 3
+2. **No key rotation** — Users can delete and re-upload, but there's no formal rotation ceremony
+3. **No machine-facing key endpoints** — `GET /:handle.keys` for SSH/PGP (like GitHub) deferred to a later phase
+4. **PGP private keys in browser** — Users must paste their private key into a textarea; no browser extension or hardware key integration yet (Phase 6)
+5. **openpgp bundle size** — `openpgp` is ~200KB gzipped; consider lazy-loading the sign/verify page
 
 ---
 

@@ -104,10 +104,6 @@ export async function proxyTwitterGraphQL(
 ) {
   const { tweetId } = req.query;
 
-  if (!tweetId || !/^\d+$/.test(tweetId)) {
-    return reply.status(400).send({ error: "Invalid or missing tweetId" });
-  }
-
   const cacheKey = `tweet:${tweetId}`;
 
   // Check cache

@@ -4,6 +4,7 @@ import { store } from "./storage";
 import { SESSION_PROFILE_TTL } from "./cache-ttl";
 import { SESSION_COOKIE_NAME } from "../src/lib/constants";
 import { proxyTwitterGraphQL } from "./routes/twitter-proxy";
+import { registerRepoProxy } from "./routes/repo-proxy";
 
 import type { FastifyInstance } from "fastify";
 import type { Handle } from "@atcute/lexicons";
@@ -71,38 +72,50 @@ export async function setupApp(app: FastifyInstance) {
 
   // ── OAuth routes ───────────────────────────────────────────────
 
-  app.get("/api/auth/login", async (req, res) => {
-    const returnTo = sanitizeReturnTo(
-      (req.query as { returnTo?: string }).returnTo,
-    );
-
-    try {
-      const handle = (req.query as { handle?: Handle }).handle;
-
-      if (!handle) {
-        return res.redirect(`${returnTo}?auth_error=missing_handle`);
-      }
-
-      // Store returnTo URL to survive OAuth redirect
-      const stateId = crypto.randomUUID();
-      await store.set(`oauth:returnTo:${stateId}`, returnTo, 600); // 10 minutes
-
-      const authUrl = await oauthClient.authorize({
-        target: {
-          type: "account",
-          identifier: handle,
+  app.get<{ Querystring: { handle?: string; returnTo?: string } }>(
+    "/api/auth/login",
+    {
+      schema: {
+        querystring: {
+          type: "object" as const,
+          properties: {
+            handle: { type: "string" },
+            returnTo: { type: "string" },
+          },
         },
-        scope: "atproto transition:generic",
-        state: stateId,
-      });
+      },
+    },
+    async (req, res) => {
+      const returnTo = sanitizeReturnTo(req.query.returnTo);
 
-      res.redirect(authUrl.url.toString());
-    } catch (error) {
-      console.error("Login error:", error);
-      const errorCode = classifyAuthError(error);
-      res.redirect(`${returnTo}?auth_error=${errorCode}`);
-    }
-  });
+      try {
+        const handle = req.query.handle as Handle | undefined;
+
+        if (!handle) {
+          return res.redirect(`${returnTo}?auth_error=missing_handle`);
+        }
+
+        // Store returnTo URL to survive OAuth redirect
+        const stateId = crypto.randomUUID();
+        await store.set(`oauth:returnTo:${stateId}`, returnTo, 600); // 10 minutes
+
+        const authUrl = await oauthClient.authorize({
+          target: {
+            type: "account",
+            identifier: handle,
+          },
+          scope: "atproto transition:generic",
+          state: stateId,
+        });
+
+        res.redirect(authUrl.url.toString());
+      } catch (error) {
+        console.error("Login error:", error);
+        const errorCode = classifyAuthError(error);
+        res.redirect(`${returnTo}?auth_error=${errorCode}`);
+      }
+    },
+  );
 
   app.get("/api/auth/callback", async (req, res) => {
     let returnTo = "/";
@@ -178,17 +191,28 @@ export async function setupApp(app: FastifyInstance) {
     }
   });
 
-  app.get("/api/auth/logout", async (req, res) => {
-    const sessionId = req.cookies[SESSION_COOKIE_NAME];
-    if (sessionId) {
-      await deleteSession(sessionId);
-    }
-    res.clearCookie(SESSION_COOKIE_NAME);
-    const returnTo = sanitizeReturnTo(
-      (req.query as { returnTo?: string }).returnTo,
-    );
-    res.redirect(returnTo);
-  });
+  app.get<{ Querystring: { returnTo?: string } }>(
+    "/api/auth/logout",
+    {
+      schema: {
+        querystring: {
+          type: "object" as const,
+          properties: {
+            returnTo: { type: "string" },
+          },
+        },
+      },
+    },
+    async (req, res) => {
+      const sessionId = req.cookies[SESSION_COOKIE_NAME];
+      if (sessionId) {
+        await deleteSession(sessionId);
+      }
+      res.clearCookie(SESSION_COOKIE_NAME);
+      const returnTo = sanitizeReturnTo(req.query.returnTo);
+      res.redirect(returnTo);
+    },
+  );
 
   app.get("/api/auth/session", async (req, res) => {
     const sessionId = req.cookies[SESSION_COOKIE_NAME];
@@ -204,7 +228,7 @@ export async function setupApp(app: FastifyInstance) {
 
     try {
       // restore() throws if session is invalid/expired
-      await oauthClient.restore(sessionData.did as `did:${string}:${string}`);
+      await oauthClient.restore(sessionData.did);
 
       // Check cache for session profile data
       const sessionCacheKey = `sessionProfile:${sessionData.did}`;
@@ -241,5 +265,23 @@ export async function setupApp(app: FastifyInstance) {
 
   // ── API routes ─────────────────────────────────────────────────
 
-  app.get("/api/twitter/tweet", proxyTwitterGraphQL);
+  app.get<{ Querystring: { tweetId: string } }>(
+    "/api/twitter/tweet",
+    {
+      schema: {
+        querystring: {
+          type: "object" as const,
+          required: ["tweetId"],
+          properties: {
+            tweetId: { type: "string", pattern: "^\\d+$" },
+          },
+        },
+      },
+    },
+    proxyTwitterGraphQL,
+  );
+
+  // ── Repo write proxy (authenticated) ────────────────────────────
+
+  await registerRepoProxy(app);
 }

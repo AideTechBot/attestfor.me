@@ -20,7 +20,7 @@ import { store } from "./storage";
 import clientMetadataJson from "../public/oauth/client-metadata.json";
 
 interface SessionData {
-  did: string;
+  did: Did;
 }
 
 export async function getSession(

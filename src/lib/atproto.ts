@@ -110,9 +110,57 @@ export async function listRecords<T = Record<string, unknown>>(
 
 // ── Proof-specific helpers ─────────────────────────────────────────
 
-import type { MeAttestProof } from "../../types/lexicons";
+import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
 
 const PROOF_COLLECTION = "me.attest.proof";
+const KEY_COLLECTION = "me.attest.key";
+
+// ── Authenticated writes (via server proxy) ────────────────────────
+
+/**
+ * Create a record in the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
+ */
+export async function createRecord(
+  collection: string,
+  record: Record<string, unknown>,
+  rkey?: string,
+): Promise<{ uri: string; cid: string }> {
+  const response = await fetch("/api/repo/createRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, record, rkey }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a record from the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
+ */
+export async function deleteRecord(
+  collection: string,
+  rkey: string,
+): Promise<void> {
+  const response = await fetch("/api/repo/deleteRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, rkey }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+}
 
 /**
  * List all proofs for a DID
@@ -132,4 +180,65 @@ export async function getProof(
   rkey: string,
 ): Promise<AtProtoRecord<MeAttestProof.Main>> {
   return getRecord<MeAttestProof.Main>(did, PROOF_COLLECTION, rkey);
+}
+
+// ── Key-specific helpers ───────────────────────────────────────────
+
+/**
+ * List all keys for a DID (public, no auth)
+ */
+export async function listKeys(
+  did: string,
+): Promise<AtProtoRecord<MeAttestKey.Main>[]> {
+  const result = await listRecords<MeAttestKey.Main>(did, KEY_COLLECTION);
+  return result.records;
+}
+
+/**
+ * Get a single key by rkey (public, no auth)
+ */
+export async function getKey(
+  did: string,
+  rkey: string,
+): Promise<AtProtoRecord<MeAttestKey.Main>> {
+  return getRecord<MeAttestKey.Main>(did, KEY_COLLECTION, rkey);
+}
+
+/**
+ * Publish a key to the authenticated user's repo (via server proxy)
+ */
+export async function publishKey(
+  record: MeAttestKey.Main,
+): Promise<{ uri: string; cid: string }> {
+  return createRecord(
+    KEY_COLLECTION,
+    record as unknown as Record<string, unknown>,
+  );
+}
+
+/**
+ * Delete a key from the authenticated user's repo (via server proxy)
+ */
+export async function deleteKey(rkey: string): Promise<void> {
+  return deleteRecord(KEY_COLLECTION, rkey);
+}
+
+/**
+ * Publish a proof to the authenticated user's repo (via server proxy).
+ * (Unblocks the Phase 2 gap — proof creation was not wired up)
+ */
+export async function publishProof(
+  record: MeAttestProof.Main,
+): Promise<{ uri: string; cid: string }> {
+  return createRecord(
+    PROOF_COLLECTION,
+    record as unknown as Record<string, unknown>,
+  );
+}
+
+/**
+ * Delete a proof from the authenticated user's repo (via server proxy)
+ */
+export async function deleteProof(rkey: string): Promise<void> {
+  return deleteRecord(PROOF_COLLECTION, rkey);
 }
