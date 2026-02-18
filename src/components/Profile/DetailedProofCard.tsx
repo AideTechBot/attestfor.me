@@ -3,7 +3,7 @@ import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
 import { ProofReplayVerification } from "./ProofReplayVerification";
 import { getProofBorderColour } from "@/lib/proof-border-colour";
-import { SERVICE_NAMES } from "@/lib/service-names";
+import { SERVICE_NAMES } from "@/lib/global-features";
 import { ServiceIcon } from "./ServiceIcon";
 import { useVerification } from "@/lib/verification-context";
 import { runVerification } from "@/lib/run-verification";

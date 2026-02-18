@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestKey } from "../../../types/lexicons";
+import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
 interface KeyCardProps {
   keyRecord: AtProtoRecord<MeAttestKey.Main>;
@@ -10,12 +11,6 @@ const KEY_ICONS: Record<string, string> = {
   pgp: "🔐",
   "ssh-ed25519": "🔑",
   "ssh-ecdsa": "🔑",
-};
-
-const KEY_TYPE_LABELS: Record<string, string> = {
-  pgp: "PGP / GPG",
-  "ssh-ed25519": "SSH Ed25519",
-  "ssh-ecdsa": "SSH ECDSA",
 };
 
 function formatDate(iso: string): string {

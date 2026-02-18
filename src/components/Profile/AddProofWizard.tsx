@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { WizardShell } from "./WizardShell";
 import { ServiceIcon } from "./ServiceIcon";
-import { SERVICE_NAMES } from "@/lib/service-names";
+import { SERVICE_NAMES } from "@/lib/global-features";
 import { VERIFIERS } from "@/lib/run-verification";
 import { generateNonce, formatChallengeText } from "@/lib/challenge";
 import type { MeAttestProof } from "../../../types/lexicons";
@@ -134,28 +135,17 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
 
   // ── Render ────────────────────────────────────────────────────────
 
-  return (
-    <div className="border border-surface-border bg-surface">
-      {/* Step header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
-        <span className="text-sm font-semibold text-accent">
-          {step === "select-service" && "Add proof — Select service"}
-          {step === "enter-handle" &&
-            `Add proof — ${SERVICE_NAMES[service] ?? service}`}
-          {step === "show-challenge" && "Add proof — Post challenge"}
-          {step === "verify" && "Add proof — Verify"}
-          {step === "done" && "Add proof — Verified ✓"}
-        </span>
-        <button
-          onClick={onCancel}
-          className="text-muted hover:text-white transition-colors text-lg leading-none"
-          aria-label="Cancel"
-        >
-          ×
-        </button>
-      </div>
+  const stepTitle = {
+    "select-service": "Add proof — Select service",
+    "enter-handle": `Add proof — ${SERVICE_NAMES[service] ?? service}`,
+    "show-challenge": "Add proof — Post challenge",
+    verify: "Add proof — Verify",
+    done: "Add proof — Verified ✓",
+  }[step];
 
-      <div className="p-4">
+  return (
+    <WizardShell title={stepTitle} onCancel={onCancel}>
+      <div className="flex flex-col gap-3">
         {/* ── Step 1: Select service ── */}
         {step === "select-service" && (
           <div className="flex flex-col gap-2">
@@ -393,6 +383,6 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
           </div>
         )}
       </div>
-    </div>
+    </WizardShell>
   );
 }

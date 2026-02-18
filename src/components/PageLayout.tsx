@@ -415,7 +415,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                     className={MENU_ITEM_CLASS}
                     onSelect={() => navigate("/edit/proofs")}
                   >
-                    Edit proofs
+                    Edit profile
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={MENU_ITEM_CLASS}

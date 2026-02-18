@@ -1,35 +1,31 @@
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof } from "../../../types/lexicons";
-import { ServiceIcon } from "./ServiceIcon";
-import { SERVICE_NAMES } from "@/lib/global-features";
-import type { PendingProof } from "./AddProofWizard";
+import type { MeAttestKey } from "../../../types/lexicons";
+import type { PendingKey } from "./AddKeyWizard";
+import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
-interface EditProofListProps {
-  /** Existing proofs fetched from the repo */
-  existing: AtProtoRecord<MeAttestProof.Main>[];
-  /** URIs of existing proofs staged for deletion */
+interface EditKeyListProps {
+  existing: AtProtoRecord<MeAttestKey.Main>[];
   toDelete: Set<string>;
-  /** New proofs staged for creation */
-  toAdd: PendingProof[];
+  toAdd: PendingKey[];
   onToggleDelete: (uri: string) => void;
   onRemoveAdd: (tempId: string) => void;
 }
 
-export function EditProofList({
+export function EditKeyList({
   existing,
   toDelete,
   toAdd,
   onToggleDelete,
   onRemoveAdd,
-}: EditProofListProps) {
-  const active = existing.filter((p) => p.value.status !== "retracted");
-  const retracted = existing.filter((p) => p.value.status === "retracted");
+}: EditKeyListProps) {
+  const active = existing.filter((k) => k.value.status !== "revoked");
+  const retracted = existing.filter((k) => k.value.status === "revoked");
 
   if (active.length === 0 && retracted.length === 0 && toAdd.length === 0) {
     return (
       <div className="flex items-center justify-center px-3 py-2.5 border border-transparent">
         <div className="flex flex-col items-center">
-          <div className="text-sm text-muted">No proofs yet.</div>
+          <div className="text-sm text-muted">No keys yet.</div>
           <div className="text-xs text-muted/60">Add one below.</div>
         </div>
       </div>
@@ -38,25 +34,38 @@ export function EditProofList({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* ── Existing active proofs ── */}
-      {active.map((proof) => {
-        const staged = toDelete.has(proof.uri);
+      {/* ── Existing active keys ── */}
+      {active.map((key) => {
+        const staged = toDelete.has(key.uri);
         return (
           <div
-            key={proof.uri}
+            key={key.uri}
             className={`flex items-center gap-3 px-3 py-2.5 border transition-colors ${
               staged
                 ? "border-red-500/40 bg-red-500/5 opacity-60"
                 : "border-surface-border"
             }`}
           >
-            <ServiceIcon service={proof.value.service} size={18} />
+            {/* Key icon */}
+            <svg
+              className="w-4 h-4 shrink-0 text-muted"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+            >
+              <circle cx="7" cy="17" r="3" />
+              <path d="M10.5 13.5L21 3" />
+              <path d="M15 9l-2 2" />
+              <path d="M18 6l-2 2" />
+            </svg>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate">
-                {SERVICE_NAMES[proof.value.service] ?? proof.value.service}
+                {key.value.label ||
+                  (KEY_TYPE_LABELS[key.value.keyType] ?? key.value.keyType)}
               </div>
-              <div className="text-xs text-muted truncate">
-                {proof.value.handle}
+              <div className="text-xs text-muted font-mono truncate">
+                {key.value.fingerprint}
               </div>
             </div>
             {staged && (
@@ -65,8 +74,8 @@ export function EditProofList({
               </span>
             )}
             <button
-              onClick={() => onToggleDelete(proof.uri)}
-              title={staged ? "Undo delete" : "Delete proof"}
+              onClick={() => onToggleDelete(key.uri)}
+              title={staged ? "Undo delete" : "Delete key"}
               className={`shrink-0 text-xs px-2 py-1 border transition-colors ${
                 staged
                   ? "border-surface-border text-muted hover:border-accent hover:text-white"
@@ -79,26 +88,40 @@ export function EditProofList({
         );
       })}
 
-      {/* ── Retracted proofs (read-only, can still delete record) ── */}
-      {retracted.map((proof) => {
-        const staged = toDelete.has(proof.uri);
+      {/* ── Retracted keys (read-only) ── */}
+      {retracted.map((key) => {
+        const staged = toDelete.has(key.uri);
         return (
           <div
-            key={proof.uri}
+            key={key.uri}
             className={`flex items-center gap-3 px-3 py-2.5 border transition-colors ${
               staged
                 ? "border-red-500/40 bg-red-500/5 opacity-60"
                 : "border-surface-border opacity-50"
             }`}
           >
-            <ServiceIcon service={proof.value.service} size={18} />
+            <svg
+              className="w-4 h-4 shrink-0 text-muted"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+            >
+              <circle cx="7" cy="17" r="3" />
+              <path d="M10.5 13.5L21 3" />
+              <path d="M15 9l-2 2" />
+              <path d="M18 6l-2 2" />
+            </svg>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate">
-                {SERVICE_NAMES[proof.value.service] ?? proof.value.service}
+                {key.value.label ||
+                  (KEY_TYPE_LABELS[key.value.keyType] ?? key.value.keyType)}
               </div>
-              <div className="text-xs text-muted truncate">
-                {proof.value.handle}
-                <span className="ml-2 text-red-400/70">· retracted</span>
+              <div className="text-xs text-muted font-mono truncate">
+                {key.value.fingerprint}
+                <span className="ml-2 text-red-400/70 font-sans">
+                  · revoked
+                </span>
               </div>
             </div>
             {staged && (
@@ -107,7 +130,7 @@ export function EditProofList({
               </span>
             )}
             <button
-              onClick={() => onToggleDelete(proof.uri)}
+              onClick={() => onToggleDelete(key.uri)}
               title={staged ? "Undo delete" : "Delete record"}
               className={`shrink-0 text-xs px-2 py-1 border transition-colors ${
                 staged
@@ -127,13 +150,26 @@ export function EditProofList({
           key={pending.tempId}
           className="flex items-center gap-3 px-3 py-2.5 border border-green-500/30 bg-green-500/5"
         >
-          <ServiceIcon service={pending.record.service} size={18} />
+          <svg
+            className="w-4 h-4 shrink-0 text-green-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+          >
+            <circle cx="7" cy="17" r="3" />
+            <path d="M10.5 13.5L21 3" />
+            <path d="M15 9l-2 2" />
+            <path d="M18 6l-2 2" />
+          </svg>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold truncate">
-              {SERVICE_NAMES[pending.record.service] ?? pending.record.service}
+              {pending.record.label ||
+                (KEY_TYPE_LABELS[pending.record.keyType] ??
+                  pending.record.keyType)}
             </div>
-            <div className="text-xs text-muted truncate">
-              {pending.record.handle}
+            <div className="text-xs text-muted font-mono truncate">
+              {pending.parsed.fingerprint}
             </div>
           </div>
           <span className="text-xs text-green-400 font-semibold shrink-0">

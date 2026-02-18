@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
-import { SERVICE_NAMES } from "@/lib/service-names";
+import { SERVICE_NAMES } from "@/lib/global-features";
 import { ServiceIcon } from "./ServiceIcon";
 import { StatusBadge } from "./StatusBadge";
 import { useVerification, type VerifyStatus } from "@/lib/verification-context";

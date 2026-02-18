@@ -7,7 +7,7 @@ import {
   profileDetailsLoader,
 } from "./pages/ProfileDetailsPage";
 import { SignVerifyPage } from "./pages/SignVerifyPage";
-import { EditProofsPage } from "./pages/EditProofsPage";
+import { EditProfilePage } from "./pages/EditProfilePage";
 import { PageLayout } from "./components/PageLayout";
 import "./index.css";
 
@@ -25,7 +25,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: "/edit/proofs",
-        element: <EditProofsPage />,
+        element: <EditProfilePage />,
       },
       {
         path: "/:handle/details",

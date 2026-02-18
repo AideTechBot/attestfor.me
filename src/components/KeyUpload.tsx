@@ -3,16 +3,11 @@ import { Upload, Key, AlertCircle, FileUp, Loader2 } from "lucide-react";
 import { parseKey, type ParsedKey } from "@/lib/key-parser";
 import { publishKey } from "@/lib/atproto";
 import { LEXICON_NS } from "@/lib/constants";
+import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
 interface KeyUploadProps {
   onSuccess: (uri: string, cid: string) => void;
 }
-
-const KEY_TYPE_LABELS: Record<string, string> = {
-  pgp: "PGP / GPG",
-  "ssh-ed25519": "SSH Ed25519",
-  "ssh-ecdsa": "SSH ECDSA",
-};
 
 export function KeyUpload({ onSuccess }: KeyUploadProps) {
   const [publicKey, setPublicKey] = useState("");
