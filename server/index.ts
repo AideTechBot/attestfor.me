@@ -15,10 +15,12 @@ const app = Fastify({
 const PORT = Number(process.env.PORT) || 3000;
 
 // Register static file serving for dist/client (assets, JS, CSS)
+// Exclude index.html — it's served by the SSR handler with runtime replacements
 await app.register(fastifyStatic, {
   root: path.resolve("dist/client"),
   prefix: "/",
   wildcard: false, // don't let static handler catch the wildcard route
+  index: false, // don't serve index.html automatically
 });
 
 // Register shared OAuth/session routes
