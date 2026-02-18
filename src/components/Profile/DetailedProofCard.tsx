@@ -35,7 +35,11 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
 
   const verifyState =
     status === "loading"
-      ? "loading"
+      ? result?.success === true
+        ? "verified"
+        : result?.success === false
+          ? "failed"
+          : "loading"
       : status === "idle"
         ? "idle"
         : result?.success

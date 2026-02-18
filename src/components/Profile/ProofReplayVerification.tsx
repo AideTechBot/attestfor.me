@@ -68,7 +68,7 @@ export function ProofReplayVerification({
       )}
 
       {/* Final Result */}
-      {result && !verifying && (
+      {result && (
         <div
           className={`mt-3 p-3 text-xs font-semibold ${
             result.success

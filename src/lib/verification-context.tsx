@@ -39,11 +39,13 @@ function verificationReducer(
   action: VerificationAction,
 ): VerificationStore {
   switch (action.type) {
-    case "VERIFY_START":
+    case "VERIFY_START": {
+      const prev = state[action.uri] ?? { ...DEFAULT_STATE };
       return {
         ...state,
-        [action.uri]: { status: "loading", result: null, steps: [] },
+        [action.uri]: { status: "loading", result: prev.result, steps: [] },
       };
+    }
     case "VERIFY_STEP": {
       const current = state[action.uri] ?? { ...DEFAULT_STATE };
       return {
