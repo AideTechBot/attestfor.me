@@ -413,6 +413,12 @@ export function PageLayout({ children }: PageLayoutProps) {
                   )}
                   <DropdownMenuItem
                     className={MENU_ITEM_CLASS}
+                    onSelect={() => navigate("/edit/proofs")}
+                  >
+                    Edit proofs
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className={MENU_ITEM_CLASS}
                     onSelect={handleLogout}
                   >
                     Sign out

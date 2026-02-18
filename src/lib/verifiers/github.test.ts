@@ -80,6 +80,8 @@ describe("GitHubVerifier", () => {
       },
     };
 
+    const CHALLENGE = "attestfor.me challenge: abc123";
+
     beforeEach(() => {
       globalThis.fetch = vi.fn();
     });
@@ -93,12 +95,34 @@ describe("GitHubVerifier", () => {
 
       const result = await verifier.verify(
         "https://gist.github.com/testuser/1234567890abcdef1234",
-        "attestfor.me challenge: abc123",
+        CHALLENGE,
         "testuser",
       );
 
       expect(result.success).toBe(true);
       expect(result.details?.username).toBe("testuser");
+    });
+
+    it("rejects when gist content has extra text around the challenge", async () => {
+      (globalThis.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          owner: { login: "testuser" },
+          files: {
+            "file.txt": { content: CHALLENGE + "\nextra line" },
+          },
+        }),
+      });
+
+      const result = await verifier.verify(
+        "https://gist.github.com/testuser/1234567890abcdef1234",
+        CHALLENGE,
+        "testuser",
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe("CHALLENGE_NOT_FOUND");
     });
 
     it("handles case-insensitive username matching", async () => {
@@ -122,7 +146,7 @@ describe("GitHubVerifier", () => {
       expect(result.success).toBe(true);
     });
 
-    it("searches all files for challenge text", async () => {
+    it("searches all files and passes when one matches exactly", async () => {
       (globalThis.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -130,7 +154,7 @@ describe("GitHubVerifier", () => {
           owner: { login: "testuser" },
           files: {
             "file1.txt": { content: "some other content" },
-            "file2.md": { content: "here is the challenge: abc123" },
+            "file2.md": { content: "challenge: abc123" },
             "file3.js": { content: "more content" },
           },
         }),
@@ -330,7 +354,7 @@ describe("GitHubVerifier", () => {
 
       await verifier.verify(
         "https://gist.github.com/testuser/abc1234567890def1234",
-        "challenge",
+        CHALLENGE,
         "testuser",
       );
 

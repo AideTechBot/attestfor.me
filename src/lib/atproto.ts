@@ -111,9 +111,10 @@ export async function listRecords<T = Record<string, unknown>>(
 // ── Proof-specific helpers ─────────────────────────────────────────
 
 import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
+import { LEXICON_NS } from "./constants";
 
-const PROOF_COLLECTION = "me.attest.proof";
-const KEY_COLLECTION = "me.attest.key";
+const PROOF_COLLECTION = `${LEXICON_NS}.proof` as const;
+const KEY_COLLECTION = `${LEXICON_NS}.key` as const;
 
 // ── Authenticated writes (via server proxy) ────────────────────────
 

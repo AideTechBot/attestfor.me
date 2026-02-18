@@ -23,10 +23,10 @@ export function generateNonce(): string {
  */
 export function formatChallengeText(
   did: string,
-  handle: string,
+  serviceHandle: string,
   service: string,
   nonce: string,
 ): string {
   // Use "attestforme" instead of "attest.me" to avoid Twitter URL linkification
-  return `I am ${did} on AT Protocol.\nVerifying my ${service} account ${handle} for attestforme.\nNonce: ${nonce}`;
+  return `I am ${did} on AT Protocol.\nVerifying my ${service} account ${serviceHandle} for attestforme.\nNonce: ${nonce}`;
 }

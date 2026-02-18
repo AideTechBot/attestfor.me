@@ -5,7 +5,7 @@ import type {} from "@atcute/lexicons/ambient";
 const _mainSchema = /*#__PURE__*/ v.record(
   /*#__PURE__*/ v.tidString(),
   /*#__PURE__*/ v.object({
-    $type: /*#__PURE__*/ v.literal("me.attest.key"),
+    $type: /*#__PURE__*/ v.literal("me.attest.alpha.key"),
     /**
      * Optional comment or description.
      * @maxGraphemes 512
@@ -77,6 +77,6 @@ export interface Main extends v.InferInput<typeof mainSchema> {}
 
 declare module "@atcute/lexicons/ambient" {
   interface Records {
-    "me.attest.key": mainSchema;
+    "me.attest.alpha.key": mainSchema;
   }
 }

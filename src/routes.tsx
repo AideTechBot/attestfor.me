@@ -7,6 +7,7 @@ import {
   profileDetailsLoader,
 } from "./pages/ProfileDetailsPage";
 import { SignVerifyPage } from "./pages/SignVerifyPage";
+import { EditProofsPage } from "./pages/EditProofsPage";
 import { PageLayout } from "./components/PageLayout";
 import "./index.css";
 
@@ -21,6 +22,10 @@ export const routes: RouteObject[] = [
       {
         path: "/sign-verify",
         element: <SignVerifyPage />,
+      },
+      {
+        path: "/edit/proofs",
+        element: <EditProofsPage />,
       },
       {
         path: "/:handle/details",

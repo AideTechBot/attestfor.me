@@ -133,7 +133,10 @@ describe("repo-proxy", () => {
 
     it("proxies createRecord with correct params", async () => {
       mockPost.mockResolvedValueOnce({
-        data: { uri: "at://did:plc:test/me.attest.key/abc", cid: "baf123" },
+        data: {
+          uri: "at://did:plc:test/me.attest.alpha.key/abc",
+          cid: "baf123",
+        },
       });
       (getSession as any).mockResolvedValueOnce({ did: "did:plc:test" });
       (oauthClient.restore as any).mockResolvedValueOnce({});
@@ -145,7 +148,11 @@ describe("repo-proxy", () => {
       };
       const { req, res, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
-        body: { collection: "me.attest.key", record, rkey: "custom-rkey" },
+        body: {
+          collection: "me.attest.alpha.key",
+          record,
+          rkey: "custom-rkey",
+        },
       });
 
       await createRecordHandler(req, res);
@@ -154,13 +161,13 @@ describe("repo-proxy", () => {
       expect(mockPost).toHaveBeenCalledWith("com.atproto.repo.createRecord", {
         input: {
           repo: "did:plc:test",
-          collection: "me.attest.key",
+          collection: "me.attest.alpha.key",
           rkey: "custom-rkey",
           record,
         },
       });
       expect(getBody()).toEqual({
-        uri: "at://did:plc:test/me.attest.key/abc",
+        uri: "at://did:plc:test/me.attest.alpha.key/abc",
         cid: "baf123",
       });
     });
@@ -173,7 +180,7 @@ describe("repo-proxy", () => {
 
       const { req, res, getStatus, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
-        body: { collection: "me.attest.key", record: { foo: "bar" } },
+        body: { collection: "me.attest.alpha.key", record: { foo: "bar" } },
       });
 
       await createRecordHandler(req, res);
@@ -248,7 +255,7 @@ describe("repo-proxy", () => {
 
       const { req, res, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
-        body: { collection: "me.attest.key", rkey: "delete-me" },
+        body: { collection: "me.attest.alpha.key", rkey: "delete-me" },
       });
 
       await deleteRecordHandler(req, res);
@@ -257,7 +264,7 @@ describe("repo-proxy", () => {
       expect(mockPost).toHaveBeenCalledWith("com.atproto.repo.deleteRecord", {
         input: {
           repo: "did:plc:test",
-          collection: "me.attest.key",
+          collection: "me.attest.alpha.key",
           rkey: "delete-me",
         },
       });
@@ -271,7 +278,7 @@ describe("repo-proxy", () => {
 
       const { req, res, getStatus, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
-        body: { collection: "me.attest.key", rkey: "bad-rkey" },
+        body: { collection: "me.attest.alpha.key", rkey: "bad-rkey" },
       });
 
       await deleteRecordHandler(req, res);

@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Upload, Key, AlertCircle, FileUp, Loader2 } from "lucide-react";
 import { parseKey, type ParsedKey } from "@/lib/key-parser";
 import { publishKey } from "@/lib/atproto";
+import { LEXICON_NS } from "@/lib/constants";
 
 interface KeyUploadProps {
   onSuccess: (uri: string, cid: string) => void;
@@ -46,7 +47,7 @@ export function KeyUpload({ onSuccess }: KeyUploadProps) {
 
     try {
       const { uri, cid } = await publishKey({
-        $type: "me.attest.key",
+        $type: `${LEXICON_NS}.key`,
         keyType: parsed.keyType,
         fingerprint: parsed.fingerprint,
         publicKey: parsed.publicKey,

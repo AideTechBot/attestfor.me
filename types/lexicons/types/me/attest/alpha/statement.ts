@@ -5,7 +5,7 @@ import type {} from "@atcute/lexicons/ambient";
 const _mainSchema = /*#__PURE__*/ v.record(
   /*#__PURE__*/ v.tidString(),
   /*#__PURE__*/ v.object({
-    $type: /*#__PURE__*/ v.literal("me.attest.statement"),
+    $type: /*#__PURE__*/ v.literal("me.attest.alpha.statement"),
     /**
      * The statement text.
      * @maxLength 10000
@@ -53,6 +53,6 @@ export interface Main extends v.InferInput<typeof mainSchema> {}
 
 declare module "@atcute/lexicons/ambient" {
   interface Records {
-    "me.attest.statement": mainSchema;
+    "me.attest.alpha.statement": mainSchema;
   }
 }

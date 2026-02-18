@@ -4,6 +4,7 @@ import {
   createStaticRouter,
   StaticRouterProvider,
 } from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routes } from "./routes";
 import { SessionHintProvider } from "./lib/session-hint";
 import { SESSION_COOKIE_NAME } from "./lib/constants";
@@ -25,11 +26,18 @@ export async function render(request: Request) {
     .split(";")
     .some((c) => c.trim().startsWith(`${SESSION_COOKIE_NAME}=`));
 
+  // Create a fresh QueryClient per request to avoid sharing state between requests
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+  });
+
   const router = createStaticRouter(handler.dataRoutes, context);
   const html = renderToString(
-    <SessionHintProvider hasSession={hasSession}>
-      <StaticRouterProvider router={router} context={context} />
-    </SessionHintProvider>,
+    <QueryClientProvider client={queryClient}>
+      <SessionHintProvider hasSession={hasSession}>
+        <StaticRouterProvider router={router} context={context} />
+      </SessionHintProvider>
+    </QueryClientProvider>,
   );
 
   // Check if this is a 404 page

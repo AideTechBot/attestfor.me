@@ -105,10 +105,13 @@ export class GitHubVerifier extends BaseProofVerifier {
         };
       }
 
-      // Check all files for the challenge text
+      // Check all files for the challenge text — the file must contain
+      // exactly the challenge text (ignoring surrounding whitespace).
+      // We do not use includes() because that would allow extra content
+      // around the challenge, making it trivial to forge.
       let foundChallenge = false;
       for (const file of Object.values(data.files || {})) {
-        if (file.content && file.content.includes(expectedChallenge)) {
+        if (file.content && file.content.trim() === expectedChallenge.trim()) {
           foundChallenge = true;
           break;
         }

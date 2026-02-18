@@ -7,7 +7,7 @@ import { SESSION_COOKIE_NAME } from "../../src/lib/constants";
 // --- Validation helpers ---
 
 const DID_RE = /^did:[a-z]+:[a-zA-Z0-9._:%-]+$/;
-const COLLECTION_RE = /^[a-zA-Z][a-zA-Z0-9-]*\.[a-zA-Z][a-zA-Z0-9-]*\.[a-zA-Z][a-zA-Z0-9-]*$/;
+const COLLECTION_RE = /^[a-zA-Z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*){2,}$/;
 
 function isDid(value: string): value is `did:${string}:${string}` {
   return DID_RE.test(value);

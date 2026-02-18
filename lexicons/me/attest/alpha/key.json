@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "me.attest.key",
+  "id": "me.attest.alpha.key",
   "defs": {
     "main": {
       "type": "record",

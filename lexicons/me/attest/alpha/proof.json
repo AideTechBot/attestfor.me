@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "me.attest.proof",
+  "id": "me.attest.alpha.proof",
   "defs": {
     "main": {
       "type": "record",

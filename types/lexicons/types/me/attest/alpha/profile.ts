@@ -5,7 +5,7 @@ import type {} from "@atcute/lexicons/ambient";
 const _mainSchema = /*#__PURE__*/ v.record(
   /*#__PURE__*/ v.literal("self"),
   /*#__PURE__*/ v.object({
-    $type: /*#__PURE__*/ v.literal("me.attest.profile"),
+    $type: /*#__PURE__*/ v.literal("me.attest.alpha.profile"),
     /**
      * Biography or description.
      * @maxGraphemes 1024
@@ -25,7 +25,7 @@ const _mainSchema = /*#__PURE__*/ v.record(
       ]),
     ),
     /**
-     * Record key (rkey) of the preferred/primary public key from me.attest.key.
+     * Record key (rkey) of the preferred/primary public key from me.attest.alpha.key.
      * @maxGraphemes 128
      */
     preferredKeyId: /*#__PURE__*/ v.optional(
@@ -46,6 +46,6 @@ export interface Main extends v.InferInput<typeof mainSchema> {}
 
 declare module "@atcute/lexicons/ambient" {
   interface Records {
-    "me.attest.profile": mainSchema;
+    "me.attest.alpha.profile": mainSchema;
   }
 }
