@@ -56,14 +56,16 @@ COOKIE_SECRET=$(load_or_generate COOKIE_SECRET)
 UMAMI_APP_SECRET=$(load_or_generate UMAMI_APP_SECRET)
 UMAMI_DB_PASSWORD=$(load_or_generate UMAMI_DB_PASSWORD)
 
-cat > .env <<EOF
+install -m 600 /dev/null .env.tmp
+cat > .env.tmp <<EOF
 DOMAIN=$DOMAIN
 COOKIE_SECRET=$COOKIE_SECRET
 UMAMI_APP_SECRET=$UMAMI_APP_SECRET
 UMAMI_DB_PASSWORD=$UMAMI_DB_PASSWORD
 EOF
+mv .env.tmp .env
 
-echo "==> .env written to $INSTALL_DIR/.env"
+echo "==> .env written to $INSTALL_DIR/.env (mode 600)"
 
 # ── Pull latest images and start ────────────────────────────────────
 echo "==> Pulling latest images..."
@@ -131,7 +133,8 @@ if [[ ${#UMAMI_WEBSITE_ID} -ne 36 ]]; then
 fi
 
 # ── Rewrite .env with all values ────────────────────────────────────
-cat > .env <<EOF
+install -m 600 /dev/null .env.tmp
+cat > .env.tmp <<EOF
 DOMAIN=$DOMAIN
 COOKIE_SECRET=$COOKIE_SECRET
 UMAMI_APP_SECRET=$UMAMI_APP_SECRET
@@ -139,6 +142,7 @@ UMAMI_DB_PASSWORD=$UMAMI_DB_PASSWORD
 UMAMI_WEBSITE_ID=$UMAMI_WEBSITE_ID
 UMAMI_ADMIN_PASSWORD=$UMAMI_ADMIN_PASSWORD
 EOF
+mv .env.tmp .env
 
 # Restart app so it picks up the website ID
 docker compose up -d app

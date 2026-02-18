@@ -179,7 +179,7 @@ export async function setupApp(app: FastifyInstance) {
           <body>
             <script>
               // Redirect to return URL with success flag
-              window.location.href = '${returnTo}?auth_success=true';
+              window.location.href = ${JSON.stringify(returnTo + "?auth_success=true")};
             </script>
           </body>
         </html>
