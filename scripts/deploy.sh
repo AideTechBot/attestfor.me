@@ -78,57 +78,68 @@ docker compose up -d
 UMAMI_WEBSITE_ID=$(load_or_generate UMAMI_WEBSITE_ID)
 UMAMI_ADMIN_PASSWORD=$(load_or_generate UMAMI_ADMIN_PASSWORD)
 
+# Helper: hit the Umami API via Caddy (which reverse-proxies analytics.$DOMAIN → umami:3000)
+# Usage: umami_fetch METHOD PATH [BODY] [TOKEN]
+umami_fetch() {
+  local method="$1" path="$2" body="${3:-}" token="${4:-}"
+  local -a args=( -sf -X "$method" )
+  if [ -n "$body" ]; then
+    args+=( -H 'Content-Type: application/json' -d "$body" )
+  fi
+  if [ -n "$token" ]; then
+    args+=( -H "Authorization: Bearer $token" )
+  fi
+  curl "${args[@]}" "https://analytics.${DOMAIN}${path}"
+}
+
 # Only run provisioning if UMAMI_WEBSITE_ID looks unset (a 64-char hex = freshly generated, not a UUID)
 if [[ ${#UMAMI_WEBSITE_ID} -ne 36 ]]; then
-  UMAMI_URL="http://localhost:3000"
   echo "==> Waiting for Umami to be ready..."
+  UMAMI_READY=false
   for i in $(seq 1 60); do
-    # Umami runs on port 3000 inside the container; we hit it via docker
-    if docker compose exec -T umami wget -q -O /dev/null http://localhost:3000/api/heartbeat 2>/dev/null; then
+    if umami_fetch GET /api/heartbeat >/dev/null 2>&1; then
+      UMAMI_READY=true
       break
     fi
     sleep 2
   done
 
-  echo "==> Provisioning Umami (changing password, creating website)..."
-
-  # Login with default credentials
-  LOGIN_RESPONSE=$(docker compose exec -T umami wget -q -O - \
-    --header='Content-Type: application/json' \
-    --post-data='{"username":"admin","password":"umami"}' \
-    http://localhost:3000/api/auth/login 2>/dev/null || true)
-
-  TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-  USER_ID=$(echo "$LOGIN_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-  if [ -n "$TOKEN" ]; then
-    # Change admin password
-    NEW_PASS=$(openssl rand -base64 24)
-    docker compose exec -T umami wget -q -O /dev/null \
-      --header='Content-Type: application/json' \
-      --header="Authorization: Bearer $TOKEN" \
-      --post-data="{\"password\":\"$NEW_PASS\"}" \
-      "http://localhost:3000/api/users/$USER_ID" 2>/dev/null || true
-
-    UMAMI_ADMIN_PASSWORD="$NEW_PASS"
-
-    # Create website
-    WEBSITE_RESPONSE=$(docker compose exec -T umami wget -q -O - \
-      --header='Content-Type: application/json' \
-      --header="Authorization: Bearer $TOKEN" \
-      --post-data="{\"name\":\"$DOMAIN\",\"domain\":\"$DOMAIN\"}" \
-      http://localhost:3000/api/websites 2>/dev/null || true)
-
-    UMAMI_WEBSITE_ID=$(echo "$WEBSITE_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-    if [ -n "$UMAMI_WEBSITE_ID" ]; then
-      echo "==> Umami website created with ID: $UMAMI_WEBSITE_ID"
-    else
-      echo "⚠️  Could not create Umami website automatically. Set UMAMI_WEBSITE_ID in .env manually."
-      UMAMI_WEBSITE_ID=""
-    fi
+  if [ "$UMAMI_READY" = false ]; then
+    echo "⚠️  Umami did not become ready after 2 minutes. Skipping auto-provisioning."
+    echo "   Provision manually at https://analytics.$DOMAIN (admin / umami)"
+    echo "   Then set UMAMI_WEBSITE_ID in $INSTALL_DIR/.env and run: docker compose up -d app"
+    UMAMI_WEBSITE_ID=""
+    UMAMI_ADMIN_PASSWORD=""
   else
-    echo "⚠️  Could not log into Umami (may already be provisioned). Skipping auto-setup."
+    echo "==> Provisioning Umami (changing password, creating website)..."
+
+    # Login with default credentials
+    LOGIN_RESPONSE=$(umami_fetch POST /api/auth/login '{"username":"admin","password":"umami"}' 2>/dev/null || true)
+
+    TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+    USER_ID=$(echo "$LOGIN_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+    if [ -n "$TOKEN" ]; then
+      # Change admin password
+      NEW_PASS=$(openssl rand -base64 24)
+      umami_fetch POST "/api/users/$USER_ID" "{\"password\":\"$NEW_PASS\"}" "$TOKEN" >/dev/null 2>&1 || true
+
+      UMAMI_ADMIN_PASSWORD="$NEW_PASS"
+
+      # Create website
+      WEBSITE_RESPONSE=$(umami_fetch POST /api/websites "{\"name\":\"$DOMAIN\",\"domain\":\"$DOMAIN\"}" "$TOKEN" 2>/dev/null || true)
+
+      UMAMI_WEBSITE_ID=$(echo "$WEBSITE_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+      if [ -n "$UMAMI_WEBSITE_ID" ]; then
+        echo "==> Umami website created with ID: $UMAMI_WEBSITE_ID"
+      else
+        echo "⚠️  Could not create Umami website automatically. Set UMAMI_WEBSITE_ID in .env manually."
+        UMAMI_WEBSITE_ID=""
+      fi
+    else
+      echo "⚠️  Could not log into Umami (may already be provisioned). Skipping auto-setup."
+    fi
   fi
 fi
 
