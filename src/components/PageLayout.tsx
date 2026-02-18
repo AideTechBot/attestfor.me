@@ -51,6 +51,7 @@ const FOOTER_LINKS = [
   },
   { href: "https://github.com/AideTechBot/attestfor.me", label: "github" },
   { href: "https://tangled.com/repo/attestfor.me", label: "tangled" },
+  { href: "/faq", label: "faq", internal: true },
 ] as const;
 
 export function PageLayout({ children }: PageLayoutProps) {
@@ -440,9 +441,21 @@ export function PageLayout({ children }: PageLayoutProps) {
         {FOOTER_LINKS.map((link, i) => (
           <span key={link.label} className="contents">
             {i > 0 && <span>·</span>}
-            <a href={link.href} className="hover:text-accent transition-colors">
-              {link.label}
-            </a>
+            {"internal" in link && link.internal ? (
+              <Link
+                to={link.href}
+                className="hover:text-accent transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                href={link.href}
+                className="hover:text-accent transition-colors"
+              >
+                {link.label}
+              </a>
+            )}
           </span>
         ))}
       </footer>

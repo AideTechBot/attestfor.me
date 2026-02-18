@@ -1,4 +1,4 @@
-import type { VerifyStatus } from "@/components/Profile/SimpleProofCard";
+import type { VerifyStatus } from "./verification-context";
 
 export type StatusColour = "neutral" | "green" | "yellow" | "red";
 

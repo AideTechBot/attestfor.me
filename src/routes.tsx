@@ -8,6 +8,7 @@ import {
 } from "./pages/ProfileDetailsPage";
 import { SignVerifyPage } from "./pages/SignVerifyPage";
 import { EditProfilePage } from "./pages/EditProfilePage";
+import { FaqPage } from "./pages/FaqPage";
 import { PageLayout } from "./components/PageLayout";
 import "./index.css";
 
@@ -18,6 +19,10 @@ export const routes: RouteObject[] = [
       {
         path: "/",
         element: <HomePage />,
+      },
+      {
+        path: "/faq",
+        element: <FaqPage />,
       },
       {
         path: "/sign-verify",
