@@ -10,133 +10,159 @@ const FAQS: FaqItem[] = [
     q: "What is ATtestfor.me?",
     a: (
       <>
-        ATtestfor.me is a tool that lets you{" "}
-        <strong>prove you own your online accounts</strong> (GitHub, Twitter,
-        etc.) and <strong>share your cryptographic public keys</strong> — all
-        tied to your AT Protocol identity. Think of it like a public,
-        tamper-proof business card that says "these accounts really are mine."
+        ATtestfor.me is a <strong>verified link page</strong> for your online
+        accounts. You know those link-in-bio pages (like Linktree) that list all
+        your accounts in one place? This is that, except every account listed
+        has been <strong>cryptographically proven</strong> to belong to you.
+        Visitors to your profile can be certain the links are genuine and not
+        faked or impersonated.
       </>
     ),
   },
   {
-    q: "What is AT Protocol?",
+    q: "Why is that better than a normal link page?",
     a: (
       <>
-        AT Protocol (used by Bluesky) is a decentralized social protocol where
-        every user has a <strong>DID</strong> (Decentralized Identifier) — a
-        permanent, globally unique ID you control. Your data lives in your own{" "}
-        <strong>personal data repository</strong>, not on someone else's server.
-        ATtestfor.me stores your proofs and keys directly inside that
-        repository.
+        On a normal link page, anyone could claim to own any account just by
+        typing it in. Here, each account is only added after you{" "}
+        <strong>prove you control it</strong> by posting a unique code to that
+        account. Only the real owner can do that. The proof is stored publicly
+        and permanently, so anyone can independently check it at any time.
       </>
     ),
   },
   {
-    q: "What is a proof?",
-    a: (
-      <>
-        A proof is a small record that links your AT Protocol identity to an
-        external account. To create one you post a special challenge string
-        (containing your DID and a random nonce) to that external account — for
-        example as a GitHub Gist. ATtestfor.me then fetches that post and
-        confirms the text matches exactly. If it does, the link is verified.
-      </>
-    ),
-  },
-  {
-    q: "How does the verification actually work?",
+    q: "How do I prove I own an account?",
     a: (
       <ol className="list-decimal list-inside space-y-1 text-sm text-muted">
+        <li>ATtestfor.me gives you a short unique text snippet to post.</li>
         <li>
-          ATtestfor.me generates a unique challenge string containing your DID
-          and a random nonce.
+          You post that snippet to the account you want to verify, for example
+          as a public GitHub Gist.
+        </li>
+        <li>You paste the link to that post back into ATtestfor.me.</li>
+        <li>
+          ATtestfor.me fetches the post and confirms the snippet is there and
+          correct.
         </li>
         <li>
-          You post that string to the external service (e.g. a public GitHub
-          Gist).
-        </li>
-        <li>You paste the URL of that post back into ATtestfor.me.</li>
-        <li>
-          ATtestfor.me fetches the URL and checks that the content matches the
-          challenge exactly.
-        </li>
-        <li>
-          If it matches, a signed proof record is written to your AT Protocol
-          repo.
-        </li>
-        <li>
-          Anyone can re-run the same check at any time — the proof is publicly
-          auditable.
+          If it matches, the account is added to your profile as verified. Done.
         </li>
       </ol>
     ),
   },
   {
-    q: "Why does the challenge have a nonce?",
+    q: 'What does "cryptographically verified" actually mean?',
     a: (
       <>
-        The nonce (a random one-time number) prevents replay attacks. Without
-        it, someone could copy an old challenge you posted elsewhere and claim
-        it proves a different account. The nonce makes each challenge unique and
-        single-use.
+        The proof is mathematically tied to your identity in a way that cannot
+        be forged or quietly altered. The snippet you post contains your unique
+        identifier and a random one-time code, so it can only ever refer to you
+        and that one verification attempt. Once stored, the record is{" "}
+        <strong>tamper-evident</strong>: changing it causes the fingerprint of
+        the data to change, and that mismatch is immediately detectable.
       </>
     ),
   },
   {
-    q: "What are public keys used for?",
+    q: "What is AT Protocol and why does it matter here?",
     a: (
       <>
-        You can upload a <strong>PGP</strong> or <strong>SSH public key</strong>{" "}
-        to your profile. This lets others encrypt messages to you, verify files
-        or commits you signed, or confirm your identity in other tools — all
-        anchored to your AT Protocol DID so people know the key genuinely
-        belongs to you.
+        AT Protocol is an open standard for decentralized social apps. Every
+        user has a permanent, unique ID called a <strong>DID</strong>. Your
+        data, including your verified account links, lives in your own{" "}
+        <strong>personal data repository</strong> that you control. ATtestfor.me
+        reads and writes to that repository. Your profile belongs to you and
+        persists regardless of what happens to this site.
       </>
     ),
   },
   {
-    q: "Can I trust that a proof hasn't been tampered with?",
+    q: "What are public keys, and do I need to care about them?",
     a: (
       <>
-        Yes. AT Protocol repositories are <strong>content-addressed</strong>:
-        every record has a CID (Content Identifier) which is a hash of its
-        contents. If anyone edits the record, the CID changes and the mismatch
-        is detectable. The proof also points to the external URL, so you can
-        independently re-check that the original post still exists and still
-        contains the correct challenge.
+        <strong>Most users can skip this entirely.</strong> For more technical
+        users: you can publish your <strong>PGP or SSH public key</strong> on
+        your profile. This lets others encrypt messages to you, or confirm that
+        files and code commits were signed by you, all tied back to your AT
+        Protocol identity.
       </>
     ),
   },
   {
-    q: "Does ATtestfor.me store my private keys?",
+    q: "Is my data private?",
     a: (
       <>
-        <strong>Never.</strong> Only your <em>public</em> key is uploaded. Your
-        private key stays on your device. ATtestfor.me cannot sign or decrypt
-        anything on your behalf.
+        Your verified account links and public keys are{" "}
+        <strong>publicly visible</strong>. That is the whole point: people can
+        look you up and trust your profile. ATtestfor.me never sees your private
+        keys or passwords. Login uses the standard AT Protocol OAuth flow and no
+        credentials are shared with this site.
       </>
     ),
   },
   {
-    q: "Who can see my proofs and keys?",
+    q: "Do I need a Bluesky account to use this?",
     a: (
       <>
-        Everyone. AT Protocol repositories are public by design. Anyone can look
-        up your handle and see the proofs and keys you've published — that's the
-        point. If you want to remove a record, you can delete or revoke it from
-        the Edit Profile page and it will be removed from your repo.
-      </>
-    ),
-  },
-  {
-    q: "Do I need a Bluesky account?",
-    a: (
-      <>
-        You need an <strong>AT Protocol</strong> account, which today means a
-        Bluesky account (or any other AT Protocol PDS). Sign in with your
-        Bluesky handle and ATtestfor.me will take care of the rest via the
-        standard AT Protocol OAuth flow — no passwords are shared with this
-        site.
+        You need <strong>any AT Protocol account</strong>. AT Protocol is an
+        open ecosystem with many apps built on top of it, including{" "}
+        <a
+          href="https://bsky.app/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Bluesky
+        </a>
+        ,{" "}
+        <a
+          href="https://tangled.org/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Tangled
+        </a>
+        ,{" "}
+        <a
+          href="https://blackskyweb.xyz/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Blacksky
+        </a>
+        ,{" "}
+        <a
+          href="https://leaflet.pub/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Leaflet
+        </a>
+        ,{" "}
+        <a
+          href="https://npmx.dev/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          npmx
+        </a>
+        ,{" "}
+        <a
+          href="https://witchsky.app/"
+          className="text-accent hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Witchsky
+        </a>
+        , and more. What you need is an AT Protocol account with a DID and a
+        handle, from any provider. Anyone can view profiles without logging in;
+        you only need to sign in to create or edit your own.
       </>
     ),
   },
@@ -148,7 +174,7 @@ export function FaqPage() {
       <div className="text-center shrink-0">
         <h1 className="text-2xl font-bold text-accent m-0 mb-1">FAQ</h1>
         <p className="text-sm text-muted m-0">
-          How ATtestfor.me works and why it's useful
+          Everything you need to know about ATtestfor.me
         </p>
       </div>
 
@@ -163,7 +189,7 @@ export function FaqPage() {
 
       <div className="text-center text-xs text-muted pt-2 pb-1">
         <Link to="/" className="hover:text-accent transition-colors">
-          ← Back to home
+          &larr; Back to home
         </Link>
       </div>
     </div>
