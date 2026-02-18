@@ -9,7 +9,9 @@ import { initializeOAuthClient } from "./oauth";
 // Initialize OAuth client
 initializeOAuthClient();
 
-const app = Fastify();
+const app = Fastify({
+  trustProxy: true,
+});
 const PORT = Number(process.env.PORT) || 3000;
 
 // Register static file serving for dist/client (assets, JS, CSS)
@@ -26,10 +28,19 @@ await setupApp(app);
 // NOTE: Requires `pnpm build` to be run first to generate dist/
 
 // Read the built HTML template once at startup
-const templateHtml = fs.readFileSync(
+const rawTemplateHtml = fs.readFileSync(
   path.resolve("dist/client/index.html"),
   "utf-8",
 );
+
+// Inject Umami website ID at runtime, or strip the script tag if not set
+const umamiId = process.env.UMAMI_WEBSITE_ID;
+const templateHtml = umamiId
+  ? rawTemplateHtml.replace("__UMAMI_WEBSITE_ID__", umamiId)
+  : rawTemplateHtml.replace(
+      /<script[^>]*data-website-id="__UMAMI_WEBSITE_ID__"[^>]*><\/script>\n?/,
+      "",
+    );
 
 // Import the SSR render function built by `vite build --ssr`
 const { render } = (await import(
@@ -84,5 +95,5 @@ app.get("/*", async (req, res) => {
   }
 });
 
-await app.listen({ port: PORT });
-console.log(`Production SSR server running at http://localhost:${PORT}`);
+await app.listen({ port: PORT, host: "0.0.0.0" });
+console.log(`Production SSR server running at http://0.0.0.0:${PORT}`);

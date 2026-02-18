@@ -1,4 +1,18 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -6,21 +20,50 @@ services:
       - redis-data:/data
 
   app:
-    build: .
-    ports:
-      - "3000:3000"
+    image: ghcr.io/aidetechbot/attestfor.me:main
+    restart: unless-stopped
+    expose:
+      - "3000"
     environment:
-      # Your production domain
-      - APP_URL=https://attestfor.me
-      # Generate a secure random secret: openssl rand -hex 32
-      - COOKIE_SECRET=${COOKIE_SECRET}
-      # Redis connection
+      - APP_URL=https://${DOMAIN:?Set DOMAIN in .env}
+      - COOKIE_SECRET=${COOKIE_SECRET:?Set COOKIE_SECRET in .env}
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=production
       - PORT=3000
-    restart: unless-stopped
+      - UMAMI_WEBSITE_ID=${UMAMI_WEBSITE_ID:-}
     depends_on:
       - redis
 
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - DATABASE_URL=postgresql://umami:${UMAMI_DB_PASSWORD:?Set UMAMI_DB_PASSWORD in .env}@umami-db:5432/umami
+      - APP_SECRET=${UMAMI_APP_SECRET:?Set UMAMI_APP_SECRET in .env}
+      - DISABLE_TELEMETRY=1
+    depends_on:
+      umami-db:
+        condition: service_healthy
+
+  umami-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=umami
+      - POSTGRES_USER=umami
+      - POSTGRES_PASSWORD=${UMAMI_DB_PASSWORD:?Set UMAMI_DB_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   redis-data:
+  caddy-data:
+  caddy-config:
+  umami-db-data:

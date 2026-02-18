@@ -1,0 +1,15 @@
+{$DOMAIN:attestfor.me} {
+	handle /u/* {
+		uri strip_prefix /u
+		reverse_proxy umami:3000
+	}
+	reverse_proxy app:3000
+}
+
+analytics.{$DOMAIN:attestfor.me} {
+	reverse_proxy umami:3000
+}
+
+testfor.me, at.testfor.me {
+	redir https://{$DOMAIN:attestfor.me}{uri} permanent
+}
