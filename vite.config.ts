@@ -15,11 +15,15 @@ export default defineConfig({
     // The placeholder is replaced at runtime by the server with the real website ID
     {
       name: "inject-umami",
-      transformIndexHtml(html) {
-        return html.replace(
-          "</head>",
-          `  <script defer src="/u/script.js" data-website-id="__UMAMI_WEBSITE_ID__"></script>\n  </head>`,
-        );
+      apply: "build",
+      transformIndexHtml: {
+        order: "post",
+        handler(html) {
+          return html.replace(
+            "</head>",
+            `  <script defer src="/u/script.js" data-website-id="__UMAMI_WEBSITE_ID__"></script>\n  </head>`,
+          );
+        },
       },
     },
   ],

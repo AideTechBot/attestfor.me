@@ -107,14 +107,10 @@ app.get("/*", async (req, res) => {
     const { html, notFound, hasSession } = result;
 
     // Inject runtime data so client hydration has session hint immediately
-    const injectScript = [
-      `<script>`,
-      `window.__HAS_SESSION__=${hasSession ? "true" : "false"};`,
-      `</script>`,
-    ].join("");
+    const injectScript = `<script>window.__HAS_SESSION__=${hasSession ? "true" : "false"};</script>`;
     const htmlWithApp = template
       .replace("<!--app-html-->", html)
-      .replace('<div id="root">', injectScript + '<div id="root">');
+      .replace("</head>", injectScript + "</head>");
 
     if (notFound) {
       res.status(404);
