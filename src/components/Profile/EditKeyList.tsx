@@ -1,3 +1,4 @@
+import { KeyRound } from "lucide-react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestKey } from "../../../types/lexicons";
 import type { PendingKey } from "./AddKeyWizard";
@@ -47,18 +48,7 @@ export function EditKeyList({
             }`}
           >
             {/* Key icon */}
-            <svg
-              className="w-4 h-4 shrink-0 text-muted"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-            >
-              <circle cx="7" cy="17" r="3" />
-              <path d="M10.5 13.5L21 3" />
-              <path d="M15 9l-2 2" />
-              <path d="M18 6l-2 2" />
-            </svg>
+            <KeyRound className="w-4 h-4 shrink-0 text-muted" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate">
                 {key.value.label ||
@@ -100,18 +90,7 @@ export function EditKeyList({
                 : "border-surface-border opacity-50"
             }`}
           >
-            <svg
-              className="w-4 h-4 shrink-0 text-muted"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-            >
-              <circle cx="7" cy="17" r="3" />
-              <path d="M10.5 13.5L21 3" />
-              <path d="M15 9l-2 2" />
-              <path d="M18 6l-2 2" />
-            </svg>
+            <KeyRound className="w-4 h-4 shrink-0 text-muted" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate">
                 {key.value.label ||
@@ -150,18 +129,7 @@ export function EditKeyList({
           key={pending.tempId}
           className="flex items-center gap-3 px-3 py-2.5 border border-green-500/30 bg-green-500/5"
         >
-          <svg
-            className="w-4 h-4 shrink-0 text-green-400"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-          >
-            <circle cx="7" cy="17" r="3" />
-            <path d="M10.5 13.5L21 3" />
-            <path d="M15 9l-2 2" />
-            <path d="M18 6l-2 2" />
-          </svg>
+          <KeyRound className="w-4 h-4 shrink-0 text-green-400" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold truncate">
               {pending.record.label ||

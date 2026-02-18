@@ -7,6 +7,7 @@ import { NotFoundContent } from "./NotFoundPage";
 import { getProfile } from "@/lib/bsky";
 import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
+import { Share2, Check } from "lucide-react";
 import { getProofStatusLabel } from "@/lib/proof-status-label";
 import { useVerificationStatuses } from "@/lib/verification-context";
 
@@ -155,7 +156,7 @@ export function ProfilePage() {
           )}
         </div>
 
-        {/* Verification Status Label */}
+        {/* Verification Status Label + Share Icon */}
         {activeProofs.length > 0 &&
           (() => {
             const { label, colour } = getProofStatusLabel(
@@ -169,10 +170,31 @@ export function ProfilePage() {
               red: "border-red-500/30 text-red-400",
             }[colour];
             return (
-              <div
-                className={`inline-flex items-center px-4 py-2 border text-sm font-semibold ${cls}`}
-              >
-                {label}
+              <div className="flex items-stretch gap-3 w-full min-w-0">
+                <div
+                  className={`flex-1 min-w-0 flex items-center justify-center px-4 py-2 border text-sm font-semibold ${cls}`}
+                >
+                  {label}
+                </div>
+                <div className="relative shrink-0 flex">
+                  <button
+                    onClick={handleShare}
+                    title="Share profile"
+                    aria-label="Share profile"
+                    className="w-9 flex items-center justify-center border border-surface-border text-muted hover:text-white hover:border-muted cursor-pointer transition-colors bg-transparent"
+                  >
+                    {copied ? (
+                      <Check className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Share2 className="w-4 h-4" />
+                    )}
+                  </button>
+                  {copied && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-surface border border-surface-border text-xs text-white whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                      Copied!
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })()}
@@ -193,22 +215,14 @@ export function ProfilePage() {
           </div>
         )}
 
-        {/* Share button — above the rule */}
         {/* Bottom section — pushed to the bottom of the card */}
         <div className="mt-auto flex flex-col items-center gap-0 w-full">
-          <button
-            onClick={handleShare}
-            className="px-4 py-2 border border-surface-border bg-surface text-sm cursor-pointer hover:border-muted hover:-translate-y-0.5 active:translate-y-0 transition-all min-w-36 mb-4"
-          >
-            {copied ? "✓ Copied!" : "Share profile"}
-          </button>
-
           <div className="flex flex-col items-center pt-3 border-t border-surface-border w-full">
             <Link
               to={`/${profile.handle}/details`}
               className="text-xs text-muted hover:text-white transition-colors"
             >
-              View technical details →
+              View technical details
             </Link>
           </div>
         </div>

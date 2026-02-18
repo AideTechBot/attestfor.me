@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -210,7 +211,7 @@ export function EditProfilePage() {
           You must be signed in to edit proofs.
         </p>
         <Link to="/" className="text-xs text-accent hover:underline">
-          ← Back
+          <ArrowLeft className="w-3.5 h-3.5 inline" /> Back
         </Link>
       </div>
     );
@@ -224,10 +225,10 @@ export function EditProfilePage() {
     <div className="flex flex-col gap-4 max-w-xl mx-auto w-full">
       {/* Back link */}
       <Link
-        to={`/@${session.handle}`}
+        to={`/@${session.handle}/details`}
         className="-mx-6 -mt-6 flex items-center mb-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold text-sm transition-colors no-underline"
       >
-        ← Back to profile
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </Link>
 
       <h1 className="text-lg font-semibold m-0">Edit profile</h1>
@@ -395,25 +396,7 @@ export function EditProfilePage() {
           >
             {saving ? (
               <>
-                <svg
-                  className="animate-spin h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Saving…
               </>
             ) : (

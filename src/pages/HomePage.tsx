@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { ArrowRight } from "lucide-react";
 
 export function HomePage() {
   return (
@@ -38,7 +39,8 @@ export function HomePage() {
             to="/faq"
             className="text-xs text-accent hover:text-accent-hover transition-colors"
           >
-            How does the verification work? →
+            How does the verification work?{" "}
+            <ArrowRight className="w-3 h-3 inline" />
           </Link>
         </p>
       </div>

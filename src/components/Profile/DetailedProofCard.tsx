@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ChevronDown } from "lucide-react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
 import { ProofReplayVerification } from "./ProofReplayVerification";
@@ -78,21 +79,9 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
           <ServiceIcon service={value.service} size={22} />
           <span className="font-semibold text-sm">{serviceName}</span>
         </div>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          className={`text-muted transition-transform ${collapsed ? "-rotate-90" : ""}`}
-        >
-          <path
-            d="M2 4L6 8L10 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <ChevronDown
+          className={`w-3 h-3 text-muted transition-transform ${collapsed ? "-rotate-90" : ""}`}
+        />
       </button>
 
       {/* Collapsible body */}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2, Check, Copy, ArrowRight } from "lucide-react";
 import { WizardShell } from "./WizardShell";
 import { ServiceIcon } from "./ServiceIcon";
 import { SERVICE_NAMES } from "@/lib/global-features";
@@ -226,29 +227,12 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
               >
                 {copied ? (
                   <>
-                    <svg
-                      className="w-3 h-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <Check className="w-3 h-3" />
                     Copied!
                   </>
                 ) : (
                   <>
-                    <svg
-                      className="w-3 h-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="1" />
-                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
+                    <Copy className="w-3 h-3" />
                     Copy
                   </>
                 )}
@@ -269,7 +253,7 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
                 }}
                 className="flex-1 py-2 text-xs bg-accent text-white hover:bg-accent-hover transition-colors"
               >
-                I've posted it →
+                I've posted it <ArrowRight className="w-3 h-3 inline" />
               </button>
             </div>
           </div>
@@ -321,25 +305,7 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
               >
                 {verifying ? (
                   <>
-                    <svg
-                      className="animate-spin h-3.5 w-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Verifying…
                   </>
                 ) : (

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { FileUp } from "lucide-react";
+import { FileUp, KeyRound, ArrowRight } from "lucide-react";
 import { WizardShell } from "./WizardShell";
 import { parseKey, type ParsedKey } from "@/lib/key-parser";
 import type { MeAttestKey } from "../../../types/lexicons";
@@ -135,18 +135,7 @@ export function AddKeyWizard({ onAdd, onCancel }: AddKeyWizardProps) {
             {parsed && (
               <div className="flex flex-col gap-1.5 border border-accent/30 bg-accent/5 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-accent">
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle cx="7" cy="17" r="3" />
-                    <path d="M10.5 13.5L21 3" />
-                    <path d="M15 9l-2 2" />
-                    <path d="M18 6l-2 2" />
-                  </svg>
+                  <KeyRound className="w-3.5 h-3.5" />
                   {KEY_TYPE_LABELS[parsed.keyType] ?? parsed.keyType}
                   {parsed.algorithm && (
                     <span className="text-muted font-normal">
@@ -196,7 +185,7 @@ export function AddKeyWizard({ onAdd, onCancel }: AddKeyWizardProps) {
                 disabled={!parsed}
                 className="flex-1 py-2 text-xs bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add key →
+                Add key <ArrowRight className="w-3 h-3 inline" />
               </button>
             </div>
           </>

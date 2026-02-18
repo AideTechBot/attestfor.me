@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { User, ExternalLink, X } from "lucide-react";
+import { User, ExternalLink, X, Loader2 } from "lucide-react";
 import { useNavigate, useLocation, Link, Outlet } from "react-router";
 import { Toaster } from "sonner";
 import { checkAuthErrorParams } from "@/lib/error-handler";
@@ -44,9 +44,9 @@ const AVATAR_MARGIN = 12; // ml-3 = 12px
 const MENU_ITEM_CLASS =
   "px-4 py-3 sm:py-2 text-base sm:text-sm rounded-none hover:bg-accent hover:text-white focus:bg-accent focus:text-white";
 
-const FOOTER_LINKS = [
+export const FOOTER_LINKS = [
   {
-    href: "https://github.com/AideTechBot/attestfor.me",
+    href: "https://bsky.app/profile/manoo.dev",
     label: "made by manoo",
   },
   { href: "https://github.com/AideTechBot/attestfor.me", label: "github" },
@@ -81,7 +81,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   const location = useLocation();
 
   const isHomePage = location.pathname === "/" || location.pathname === "/home";
-  const isOwnProfile = location.pathname === `/@${session.handle}`;
+  const isOwnProfile = location.pathname === `/@${session.handle}/details`;
 
   // Check if user likely has a session (set via cookie, available during SSR)
   const maybeAuthenticated = useSessionHint();
@@ -182,7 +182,7 @@ export function PageLayout({ children }: PageLayoutProps) {
       : searchValue;
     addRecentSearch(clean);
     setRecentSearches(getRecentSearches());
-    navigate(`/@${clean}`);
+    navigate(`/@${clean}/details`);
     setSearchValue("");
     inputRef.current?.blur();
   };
@@ -190,7 +190,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   const handleSearchSelect = (handle: string) => {
     addRecentSearch(handle);
     setRecentSearches(getRecentSearches());
-    navigate(`/@${handle}`);
+    navigate(`/@${handle}/details`);
     setSearchValue("");
     inputRef.current?.blur();
   };
@@ -372,26 +372,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                       >
                         {isLoggingIn ? (
                           <>
-                            <svg
-                              className="animate-spin h-4 w-4"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              />
-                            </svg>
+                            <Loader2 className="h-4 w-4 animate-spin" />
                             <span>Signing in...</span>
                           </>
                         ) : (
@@ -406,7 +387,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                   {!isOwnProfile && (
                     <DropdownMenuItem
                       className={cn("whitespace-nowrap", MENU_ITEM_CLASS)}
-                      onSelect={() => navigate(`/@${session.handle}`)}
+                      onSelect={() => navigate(`/@${session.handle}/details`)}
                     >
                       <span>Visit profile</span>
                       <ExternalLink className="w-4 h-4 ml-auto" />

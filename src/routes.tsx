@@ -10,6 +10,7 @@ import { SignVerifyPage } from "./pages/SignVerifyPage";
 import { EditProfilePage } from "./pages/EditProfilePage";
 import { FaqPage } from "./pages/FaqPage";
 import { PageLayout } from "./components/PageLayout";
+import { SimplePageLayout } from "./components/SimplePageLayout";
 import "./index.css";
 
 export const routes: RouteObject[] = [
@@ -38,13 +39,18 @@ export const routes: RouteObject[] = [
         loader: profileDetailsLoader,
       },
       {
+        path: "*",
+        element: <NotFoundPage />,
+      },
+    ],
+  },
+  {
+    element: <SimplePageLayout />,
+    children: [
+      {
         path: "/:handle",
         element: <ProfilePage />,
         loader: profileLoader,
-      },
-      {
-        path: "*",
-        element: <NotFoundPage />,
       },
     ],
   },

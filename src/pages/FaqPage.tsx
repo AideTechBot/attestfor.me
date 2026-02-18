@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { ArrowLeft } from "lucide-react";
 
 interface FaqItem {
   q: string;
@@ -189,7 +190,7 @@ export function FaqPage() {
 
       <div className="text-center text-xs text-muted pt-2 pb-1">
         <Link to="/" className="hover:text-accent transition-colors">
-          &larr; Back to home
+          <ArrowLeft className="w-3 h-3 inline" /> Back to home
         </Link>
       </div>
     </div>

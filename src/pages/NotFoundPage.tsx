@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { ArrowLeft } from "lucide-react";
 
 export function NotFoundContent() {
   return (
@@ -7,9 +8,9 @@ export function NotFoundContent() {
       <p className="text-lg text-muted m-0 mb-8">Page not found</p>
       <Link
         to="/"
-        className="text-accent hover:text-accent-hover transition-colors"
+        className="text-accent hover:text-accent-hover transition-colors inline-flex items-center gap-1.5"
       >
-        ← Back to Home
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
       </Link>
     </div>
   );
