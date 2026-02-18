@@ -3,14 +3,12 @@ import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
 import { SERVICE_NAMES } from "@/lib/service-names";
 import { ServiceIcon } from "./ServiceIcon";
-import { StatusBadge, type VerifyStatus } from "./StatusBadge";
-
-export type { VerifyStatus };
+import { StatusBadge } from "./StatusBadge";
+import { useVerification, type VerifyStatus } from "@/lib/verification-context";
+import { runVerification } from "@/lib/run-verification";
 
 interface SimpleProofCardProps {
   proof: AtProtoRecord<MeAttestProof.Main>;
-  verifyStatus?: VerifyStatus;
-  onVerify?: () => void;
 }
 
 function getTargetUrl(proof: MeAttestProof.Main): string | undefined {
@@ -24,14 +22,16 @@ function getTargetUrl(proof: MeAttestProof.Main): string | undefined {
   }
 }
 
-export function SimpleProofCard({
-  proof,
-  verifyStatus = "idle",
-  onVerify,
-}: SimpleProofCardProps) {
+export function SimpleProofCard({ proof }: SimpleProofCardProps) {
   const { value } = proof;
+  const { status, dispatch } = useVerification(proof.uri);
+  const verifyStatus = status;
   const serviceName = SERVICE_NAMES[value.service] || value.service;
   const targetUrl = getTargetUrl(value);
+
+  const handleVerify = () => {
+    void runVerification(proof, dispatch);
+  };
 
   // Whether the unverified warning dropdown is open
   const [showWarning, setShowWarning] = useState(false);
@@ -77,7 +77,7 @@ export function SimpleProofCard({
     // idle — kick off verification before navigating
     e.preventDefault();
     clickedCardRef.current = true;
-    onVerify?.();
+    handleVerify();
   };
 
   // When status transitions to verified, wait 250 ms then navigate
@@ -119,7 +119,7 @@ export function SimpleProofCard({
       </div>
 
       {/* Status Badge */}
-      <StatusBadge status={verifyStatus} onVerify={onVerify} />
+      <StatusBadge status={verifyStatus} onVerify={handleVerify} />
     </div>
   );
 

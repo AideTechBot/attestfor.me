@@ -1,19 +1,14 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link } from "react-router";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
-import {
-  SimpleProofCard,
-  type VerifyStatus,
-} from "@/components/Profile/SimpleProofCard";
+import { SimpleProofCard } from "@/components/Profile/SimpleProofCard";
 import { NotFoundContent } from "./NotFoundPage";
 import { getProfile } from "@/lib/bsky";
 import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
-import { GitHubVerifier } from "@/lib/verifiers/github";
-import { TwitterVerifier } from "@/lib/verifiers/twitter";
-import type { BaseProofVerifier } from "@/lib/verifiers/base-verifier";
 import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
 import { getProofStatusLabel } from "@/lib/proof-status-label";
+import { useVerificationStatuses } from "@/lib/verification-context";
 
 interface ProfileData {
   handle: string;
@@ -183,39 +178,7 @@ export async function profileLoader({
   }
 }
 
-const VERIFIERS: Record<string, () => BaseProofVerifier> = {
-  github: () => new GitHubVerifier(),
-  twitter: () => new TwitterVerifier(),
-};
-
 // ── Stub verification (remove when real verification is ready) ──
-const STUB_VERIFICATION = true;
-
-async function runVerification(
-  proof: AtProtoRecord<MeAttestProof.Main>,
-): Promise<VerifyStatus> {
-  if (STUB_VERIFICATION) {
-    await new Promise((r) => setTimeout(r, 2000));
-    return proof.value.service === "twitter" ? "failed" : "verified";
-  }
-
-  const factory = VERIFIERS[proof.value.service];
-  if (!factory) {
-    return "failed";
-  }
-  try {
-    const verifier = factory();
-    const result = await verifier.verify(
-      proof.value.proofUrl,
-      proof.value.challengeText ?? "",
-      proof.value.handle,
-    );
-    return result.success ? "verified" : "failed";
-  } catch {
-    return "failed";
-  }
-}
-
 export function ProfilePage() {
   const profile = useLoaderData() as ProfileData;
 
@@ -223,22 +186,11 @@ export function ProfilePage() {
     ? profile.proofs.filter((p) => p.value.status !== "retracted")
     : [];
 
-  // Map from proof URI → VerifyStatus
-  const [statuses, setStatuses] = useState<Record<string, VerifyStatus>>({});
   const [copied, setCopied] = useState(false);
 
-  const verifySingle = useCallback(
-    async (uri: string) => {
-      const proof = activeProofs.find((p) => p.uri === uri);
-      if (!proof || statuses[uri] === "loading") {
-        return;
-      }
-      setStatuses((prev) => ({ ...prev, [uri]: "loading" }));
-      const result = await runVerification(proof);
-      setStatuses((prev) => ({ ...prev, [uri]: result }));
-    },
-    [activeProofs, statuses],
-  );
+  // Read statuses for the summary label — each SimpleProofCard manages its
+  // own verification, we just need the statuses for getProofStatusLabel.
+  const proofStatuses = useVerificationStatuses(activeProofs.map((p) => p.uri));
 
   if (!profile.isValid) {
     return <NotFoundContent />;
@@ -295,7 +247,7 @@ export function ProfilePage() {
           (() => {
             const { label, colour } = getProofStatusLabel(
               activeProofs.length,
-              activeProofs.map((p) => statuses[p.uri] ?? "idle"),
+              proofStatuses,
             );
             const cls = {
               neutral: "border-surface-border text-muted",
@@ -316,12 +268,7 @@ export function ProfilePage() {
         {activeProofs.length > 0 ? (
           <div className="flex flex-col gap-3 w-full">
             {activeProofs.map((proof) => (
-              <SimpleProofCard
-                key={proof.uri}
-                proof={proof}
-                verifyStatus={statuses[proof.uri] ?? "idle"}
-                onVerify={() => verifySingle(proof.uri)}
-              />
+              <SimpleProofCard key={proof.uri} proof={proof} />
             ))}
           </div>
         ) : (

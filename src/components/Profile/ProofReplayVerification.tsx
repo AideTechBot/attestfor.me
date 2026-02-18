@@ -1,169 +1,39 @@
-import { useState, useRef, useEffect } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
-import { GitHubVerifier } from "@/lib/verifiers/github";
-import { TwitterVerifier } from "@/lib/verifiers/twitter";
-import type {
-  BaseProofVerifier,
-  VerificationResult,
-} from "@/lib/verifiers/base-verifier";
+import { useVerification } from "@/lib/verification-context";
+import { runVerification, VERIFIERS } from "@/lib/run-verification";
 
 interface ProofReplayVerificationProps {
   proof: AtProtoRecord<MeAttestProof.Main>;
-  // Optional: lift state from parent so the card header badge stays in sync
-  externalVerifying?: boolean;
-  externalResult?: VerificationResult | null;
-  externalSteps?: VerificationStep[];
-  onVerifyStart?: () => void;
-  onVerifyDone?: (
-    result: VerificationResult,
-    steps: VerificationStep[],
-  ) => void;
-  // Increment to trigger a verification run from outside
-  triggerCount?: number;
-  // Whether the parent's rate limit window is active (disables the replay button)
+  // Rate limit window controlled by parent (UI-only)
   rateLimited?: boolean;
   // Called when the replay button is clicked — parent owns rate limit logic
   onReplayClick?: () => void;
 }
 
-export interface VerificationStep {
-  step: string;
-  status: "success" | "error" | "pending";
-  message: string;
-}
-
-const VERIFIERS: Record<string, () => BaseProofVerifier> = {
-  github: () => new GitHubVerifier(),
-  twitter: () => new TwitterVerifier(),
-};
-
 export function ProofReplayVerification({
   proof,
-  externalVerifying,
-  externalResult,
-  externalSteps,
-  onVerifyStart,
-  onVerifyDone,
-  triggerCount = 0,
   rateLimited = false,
   onReplayClick,
 }: ProofReplayVerificationProps) {
-  const [internalVerifying, setInternalVerifying] = useState(false);
-  const [internalResult, setInternalResult] =
-    useState<VerificationResult | null>(null);
-  const [internalSteps, setInternalSteps] = useState<VerificationStep[]>([]);
-  const handleReplayRef = useRef<() => void>(() => {});
+  const { status, result, steps, dispatch } = useVerification(proof.uri);
 
-  const verifying = externalVerifying ?? internalVerifying;
-  const result = externalResult !== undefined ? externalResult : internalResult;
-  const steps = externalSteps ?? internalSteps;
+  const verifying = status === "loading";
+  const hasVerifier = proof.value.service in VERIFIERS;
 
-  const { value } = proof;
-  const hasVerifier = value.service in VERIFIERS;
-
-  const handleReplay = async () => {
-    if (!hasVerifier) {
+  const handleReplay = () => {
+    if (verifying || rateLimited) {
       return;
     }
-
-    setInternalVerifying(true);
-    setInternalResult(null);
-    setInternalSteps([]);
-    onVerifyStart?.();
-
-    const currentSteps: VerificationStep[] = [];
-
-    const addStep = (
-      step: string,
-      status: VerificationStep["status"],
-      message: string,
-    ) => {
-      currentSteps.push({ step, status, message });
-      setInternalSteps([...currentSteps]);
-    };
-
-    const updateLastStep = (
-      status: VerificationStep["status"],
-      message: string,
-    ) => {
-      const last = currentSteps[currentSteps.length - 1];
-      currentSteps[currentSteps.length - 1] = { ...last, status, message };
-      setInternalSteps([...currentSteps]);
-    };
-
-    try {
-      addStep("Validate URL", "pending", "Checking proof URL format…");
-      const verifier = VERIFIERS[value.service]();
-      const urlValid = verifier.validateProofUrl(value.proofUrl);
-
-      if (!urlValid) {
-        updateLastStep("error", "Invalid proof URL format");
-        const r: VerificationResult = {
-          success: false,
-          error: "Invalid proof URL format",
-          errorCode: "INVALID_URL",
-        };
-        setInternalResult(r);
-        onVerifyDone?.(r, [...currentSteps]);
-        return;
-      }
-      updateLastStep("success", "Proof URL format is valid");
-
-      addStep("Check handle", "pending", "Validating handle…");
-      const normalizedHandle = verifier.normalizeHandle(value.handle);
-      updateLastStep("success", `Handle: ${normalizedHandle}`);
-
-      addStep(
-        "Verify proof",
-        "pending",
-        "Fetching proof content and verifying…",
-      );
-      const challengeText = value.challengeText || "";
-      const verificationResult = await verifier.verify(
-        value.proofUrl,
-        challengeText,
-        value.handle,
-      );
-
-      updateLastStep(
-        verificationResult.success ? "success" : "error",
-        verificationResult.success
-          ? "Challenge text found and verified"
-          : verificationResult.error || "Verification failed",
-      );
-      setInternalResult(verificationResult);
-      onVerifyDone?.(verificationResult, [...currentSteps]);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      addStep("Error", "error", message);
-      const r: VerificationResult = {
-        success: false,
-        error: message,
-        errorCode: "UNKNOWN_ERROR",
-      };
-      setInternalResult(r);
-      onVerifyDone?.(r, [...currentSteps]);
-    } finally {
-      setInternalVerifying(false);
-    }
+    void runVerification(proof, dispatch);
   };
 
-  // Keep ref up to date so the useEffect below always calls the latest version
-  handleReplayRef.current = handleReplay;
-
-  // Fire when triggerCount changes (badge click from parent)
-  useEffect(() => {
-    if (triggerCount > 0) {
-      handleReplayRef.current();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerCount]);
+  const handleClick = onReplayClick ?? handleReplay;
 
   if (!hasVerifier) {
     return (
       <div className="text-xs text-muted">
-        No verifier available for {value.service}
+        No verifier available for {proof.value.service}
       </div>
     );
   }
@@ -171,7 +41,7 @@ export function ProofReplayVerification({
   return (
     <div>
       <button
-        onClick={onReplayClick ?? handleReplay}
+        onClick={handleClick}
         disabled={verifying || rateLimited}
         className="w-full h-10 flex items-center justify-center text-xs font-semibold bg-accent text-white border-none cursor-pointer hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >

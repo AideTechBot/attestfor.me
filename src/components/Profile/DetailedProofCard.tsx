@@ -1,14 +1,12 @@
 import { useState, useRef } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { MeAttestProof } from "../../../types/lexicons";
-import {
-  ProofReplayVerification,
-  type VerificationStep,
-} from "./ProofReplayVerification";
-import type { VerificationResult } from "@/lib/verifiers/base-verifier";
+import { ProofReplayVerification } from "./ProofReplayVerification";
 import { getProofBorderColour } from "@/lib/proof-border-colour";
 import { SERVICE_NAMES } from "@/lib/service-names";
 import { ServiceIcon } from "./ServiceIcon";
+import { useVerification } from "@/lib/verification-context";
+import { runVerification } from "@/lib/run-verification";
 
 interface DetailedProofCardProps {
   proof: AtProtoRecord<MeAttestProof.Main>;
@@ -25,33 +23,30 @@ function formatDate(iso: string): string {
 export function DetailedProofCard({ proof }: DetailedProofCardProps) {
   const { value } = proof;
   const [collapsed, setCollapsed] = useState(true);
-  const [verifying, setVerifying] = useState(false);
-  const [rateLimited, setRateLimited] = useState(false);
-  const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(
-    null,
-  );
-  const [verifySteps, setVerifySteps] = useState<VerificationStep[]>([]);
-  const [triggerCount, setTriggerCount] = useState(0);
   const lastVerifyRef = useRef<number>(0);
   const rateLimitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+
+  const { status, result, dispatch } = useVerification(proof.uri);
 
   const serviceName = SERVICE_NAMES[value.service] || value.service;
   const isActive = value.status !== "retracted";
   const recordStatus = isActive ? "active" : "retracted";
 
-  const verifyState = verifying
-    ? "loading"
-    : verifyResult === null
-      ? "idle"
-      : verifyResult.success
-        ? "verified"
-        : "failed";
+  const verifyState =
+    status === "loading"
+      ? "loading"
+      : status === "idle"
+        ? "idle"
+        : result?.success
+          ? "verified"
+          : "failed";
 
   const borderColour = getProofBorderColour(recordStatus, verifyState);
 
   const triggerVerify = () => {
     const now = Date.now();
-    if (now - lastVerifyRef.current < 1000 || verifying) {
+    if (now - lastVerifyRef.current < 1000 || status === "loading") {
       return;
     }
     lastVerifyRef.current = now;
@@ -60,7 +55,7 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
       clearTimeout(rateLimitTimerRef.current);
     }
     rateLimitTimerRef.current = setTimeout(() => setRateLimited(false), 1000);
-    setTriggerCount((c) => c + 1);
+    void runVerification(proof, dispatch);
   };
 
   const handleVerifyClick = (e: React.MouseEvent) => {
@@ -126,29 +121,29 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
                   <td className="px-3 py-2">
                     <button
                       onClick={handleVerifyClick}
-                      disabled={verifying || rateLimited}
+                      disabled={status === "loading" || rateLimited}
                       title={
-                        verifyResult
-                          ? verifyResult.success
+                        result
+                          ? result.success
                             ? "Passed — click to re-run"
                             : "Failed — click to retry"
                           : "Click to verify"
                       }
                       className={`text-xs font-semibold bg-transparent border-none p-0 cursor-pointer transition-colors disabled:cursor-not-allowed ${
-                        verifying
+                        status === "loading"
                           ? "text-white/40"
-                          : verifyResult === null
+                          : status === "idle"
                             ? "text-white/50 hover:text-white/80"
-                            : verifyResult.success
+                            : result?.success
                               ? "text-green-400 hover:text-green-300"
                               : "text-red-400 hover:text-red-300"
                       }`}
                     >
-                      {verifying
+                      {status === "loading"
                         ? "verifying…"
-                        : verifyResult === null
+                        : status === "idle"
                           ? "unknown"
-                          : verifyResult.success
+                          : result?.success
                             ? "passed"
                             : "failed"}
                     </button>
@@ -250,22 +245,8 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
               <div className="px-4 py-4 border-t border-surface-border">
                 <ProofReplayVerification
                   proof={proof}
-                  externalVerifying={verifying}
-                  externalResult={verifyResult}
-                  externalSteps={verifySteps}
-                  triggerCount={triggerCount}
                   rateLimited={rateLimited}
                   onReplayClick={triggerVerify}
-                  onVerifyStart={() => {
-                    setVerifying(true);
-                    setVerifyResult(null);
-                    setVerifySteps([]);
-                  }}
-                  onVerifyDone={(result, steps) => {
-                    setVerifyResult(result);
-                    setVerifySteps(steps);
-                    setVerifying(false);
-                  }}
                 />
               </div>
             )}

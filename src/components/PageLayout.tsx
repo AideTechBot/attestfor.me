@@ -24,6 +24,7 @@ import { useSessionHint } from "@/lib/session-hint";
 import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
 import { thumbnailAvatar } from "@/lib/bsky";
+import { VerificationProvider } from "@/lib/verification-context";
 import "./search-animated.css";
 
 interface PageLayoutProps {
@@ -425,7 +426,7 @@ export function PageLayout({ children }: PageLayoutProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col border border-surface-border p-6">
-        {children ?? <Outlet />}
+        <VerificationProvider>{children ?? <Outlet />}</VerificationProvider>
       </div>
 
       {/* Footer */}
