@@ -1,6 +1,6 @@
 # Phase 4: Profile & Verification UI — Detailed Implementation Guide
 
-**Objective:** Build two distinct profile views (simple LinkTree-style and detailed technical view), implement verification status UI, create proof status badges, and build public verification report pages.
+**Objective:** Build two distinct profile views (simple LinkTree-style and detailed technical view), implement proof/key display with status badges, and add client-side proof re-verification.
 
 **Prerequisites:**
 - Phase 1 completed (lexicons, AT Proto library, API routes)
@@ -13,283 +13,299 @@
 
 AttestFor.me provides **two distinct profile routes** to serve different audiences:
 
-1. **Simple Profile** (`/[handle]`) — LinkTree-style interface for non-technical users
+1. **Simple Profile** (`/:handle`) — LinkTree-style interface for non-technical users
    - Clean, minimal design with large account cards
    - Shows verified accounts with visual checkmarks
    - No technical jargon, DIDs, or cryptographic details
    - Target: General users, recruiters, collaborators
 
-2. **Technical Details Profile** (`/[handle]/details`) — Full verification dashboard
+2. **Technical Details Profile** (`/:handle/details`) — Full verification dashboard
    - Shows DID, public keys, detailed proof information
-   - Client-side replay and server verification
-   - Signed statements and web of trust data
+   - Client-side replay verification
    - Export capabilities and re-verification actions
    - Target: Developers, security researchers, auditors
 
 ---
 
-## Task 4.1: Simple Profile Page (LinkTree-Style)
+## Architecture Decisions
+
+These decisions were made based on the actual codebase as of Phase 3:
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Data fetching | Client-side via existing helpers | `src/lib/atproto.ts` already has `listProofs()`, `listKeys()` — no new server endpoint needed |
+| Server verification | Not included | All verification is client-side via `src/lib/verifiers/` — no server-side verifier infrastructure |
+| Statements | Deferred | No statement creation flow exists yet — will add when the creation flow is built |
+| Verification reports | Not included | Will be added in a future phase |
+| Background re-verification | Not included | Production concern, not needed for Phase 4 |
+| Re-verification | Client-side only | `ProofReplayVerification` runs existing browser verifiers (`GitHubVerifier`, `TwitterVerifier`) |
+| Proof/key data | Stubbed | No proof creation wizard exists yet — stub with empty data, design around empty states |
+| Styling | Tailwind CSS v4 | Project uses Tailwind v4 with `@tailwindcss/vite`, custom theme tokens in `src/colors.css` |
+| Routing | React Router v7 loaders | Matches existing `ProfilePage` pattern (`LoaderFunctionArgs` → `useLoaderData`) |
+| Server framework | Fastify | No new server routes in this phase, but noted for consistency |
+| AT Proto client | `@atcute/*` ecosystem | Project uses `@atcute/client`, NOT `@atproto/api` |
+
+---
+
+## Existing Code Reference
+
+### Current `ProfilePage.tsx` (to be extended)
+
+The existing page uses a React Router loader, fetches from `getProfile()` in `src/lib/bsky.ts`, and renders avatar/name/handle/bio. Phase 4 extends this — it does **not** replace it.
+
+### Available helpers in `src/lib/atproto.ts`
+
+```typescript
+// Public reads (no auth) — these are what the profile pages will use
+listProofs(did: string): Promise<AtProtoRecord<MeAttestProof.Main>[]>
+listKeys(did: string): Promise<AtProtoRecord<MeAttestKey.Main>[]>
+getProof(did: string, rkey: string): Promise<AtProtoRecord<MeAttestProof.Main>>
+getKey(did: string, rkey: string): Promise<AtProtoRecord<MeAttestKey.Main>>
+parseAtUri(uri: string): { repo: string; collection: string; rkey: string }
+```
+
+### Available helpers in `src/lib/bsky.ts`
+
+```typescript
+getProfile(actor: string): Promise<BskyProfile | null>     // returns did, handle, displayName, description, avatar
+resolveHandle(handle: string): Promise<string | null>       // handle → DID
+```
+
+### Existing verifiers in `src/lib/verifiers/`
+
+```typescript
+// BaseProofVerifier interface
+abstract verify(proofUrl: string, expectedChallenge: string, handle: string): Promise<VerificationResult>
+abstract validateProofUrl(proofUrl: string): boolean
+abstract normalizeHandle(handle: string): string
+abstract getServiceName(): string
+
+// Concrete verifiers
+GitHubVerifier   // verifies GitHub gist proofs
+TwitterVerifier  // verifies Twitter tweet proofs (via /api/twitter/tweet proxy)
+```
+
+### Lexicon types
+
+```typescript
+// MeAttestProof.Main fields:
+service: string             // "github" | "twitter" | ...
+handle: string              // username on external service
+proofUrl: string            // URL to proof (gist, tweet)
+challengeText?: string      // full challenge text
+nonce: string               // random nonce
+createdAt: string           // ISO 8601
+status?: "active" | "retracted"
+retractedAt?: string        // ISO 8601
+
+// MeAttestKey.Main fields:
+keyType: string             // "pgp" | "ssh-ed25519" | "ssh-ecdsa"
+publicKey: string           // full public key text
+fingerprint?: string        // hex fingerprint
+label?: string              // user-defined label
+comment?: string            // optional description
+createdAt: string           // ISO 8601
+expiresAt?: string          // ISO 8601
+status?: "active" | "revoked"
+```
+
+### Theme tokens (from `src/colors.css`)
+
+```
+--color-accent, --color-accent-hover, --color-accent-subtle
+--color-surface, --color-surface-border, --color-input
+--color-muted, --color-page
+```
+
+All styling must use Tailwind utility classes with these tokens (e.g. `bg-surface`, `text-muted`, `border-surface-border`).
+
+---
+
+## Task 4.1: Extend Simple Profile Page (LinkTree-Style)
 
 ### Location
-Create file: `src/pages/ProfilePage.tsx`
+Modify file: `src/pages/ProfilePage.tsx`
+
+### Changes
+
+1. **Extend the loader** to also resolve the handle to a DID via `getProfile()` (which already returns `did`), then fetch proofs and keys via `listProofs(did)` and `listKeys(did)` from `src/lib/atproto.ts`
+2. **Extend the component** to render a verified accounts grid, verification summary, and footer with link to details page
 
 ### Implementation
 
 ```typescript
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { SimpleProofCard } from '../components/Profile/SimpleProofCard';
+import type { LoaderFunctionArgs } from "react-router";
+import { useLoaderData, Link } from "react-router";
+import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
+import { SimpleProofCard } from "@/components/Profile/SimpleProofCard";
+import { NotFoundContent } from "./NotFoundPage";
+import { getProfile } from "@/lib/bsky";
+import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
 
 interface ProfileData {
-  did: string;
   handle: string;
+  did: string;
   displayName?: string;
+  description?: string;
   avatar?: string;
-  proofs: any[];
-  keys: any[];
-  statements: any[];
-  profile?: any;
+  isValid: boolean;
+  proofs: AtProtoRecord<MeAttestProof.Main>[];
+  keys: AtProtoRecord<MeAttestKey.Main>[];
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function profileLoader({
+  params,
+}: LoaderFunctionArgs): Promise<ProfileData> {
+  const handle = params.handle;
+
+  if (!handle) {
+    return { handle: "", did: "", isValid: false, proofs: [], keys: [] };
+  }
+
+  const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
+
+  // Skip requests for static files that hit the /:handle route
+  if (
+    /\.(ico|png|jpg|jpeg|svg|webp|gif|js|css|map|json|txt|xml|webmanifest)$/i.test(
+      cleanHandle,
+    )
+  ) {
+    return { handle: cleanHandle, did: "", isValid: false, proofs: [], keys: [] };
+  }
+
+  try {
+    const profile = await getProfile(cleanHandle);
+    if (!profile) {
+      return { handle: cleanHandle, did: "", isValid: false, proofs: [], keys: [] };
+    }
+
+    // Fetch proofs and keys in parallel using the DID
+    const [proofs, keys] = await Promise.all([
+      listProofs(profile.did).catch(() => []),
+      listKeys(profile.did).catch(() => []),
+    ]);
+
+    return {
+      handle: profile.handle,
+      did: profile.did,
+      displayName: profile.displayName,
+      description: profile.description,
+      avatar: profile.avatar,
+      isValid: true,
+      proofs,
+      keys,
+    };
+  } catch (error) {
+    console.error("[ProfileLoader] Error fetching profile:", error);
+    return { handle: cleanHandle, did: "", isValid: false, proofs: [], keys: [] };
+  }
 }
 
 export function ProfilePage() {
-  const { identifier } = useParams<{ identifier: string }>();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const profile = useLoaderData() as ProfileData;
 
-  useEffect(() => {
-    loadProfile();
-  }, [identifier]);
+  if (!profile.isValid) {
+    return <NotFoundContent />;
+  }
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const activeProofs = profile.proofs.filter(
+    (p) => p.value.status !== "retracted",
+  );
 
-      const response = await fetch(`/api/profile/${identifier}`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load profile');
-      }
-
-      const data = await response.json();
-      setProfile(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      await navigator.share({ title: `${profile.displayName || profile.handle} on AttestFor.me`, url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      // TODO: toast notification
     }
   };
 
-  if (loading) {
-    return (
-      <div className="profile-page loading">
-        <div className="spinner">Loading profile...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="profile-page error">
-        <h2>Error</h2>
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="profile-page not-found">
-        <h2>Profile Not Found</h2>
-        <p>The user {identifier} could not be found.</p>
-      </div>
-    );
-  }
-
-  const verifiedProofsCount = profile.proofs.filter((p) => p.status === 'verified').length;
-  const totalProofsCount = profile.proofs.length;
-
   return (
-    <div className="profile-page simple">
-      {/* Profile Header */}
-      <div className="profile-header">
-        <div className="profile-avatar-large">
-          {profile.avatar ? (
-            <img src={profile.avatar} alt={profile.displayName || profile.handle} />
-          ) : (
-            <div className="avatar-placeholder-large">
-              {(profile.displayName || profile.handle).charAt(0).toUpperCase()}
+    <>
+      {/* Profile Section */}
+      <div className="flex flex-col items-center gap-6 max-w-xl mx-auto w-full">
+        {/* Profile Picture */}
+        {profile.avatar ? (
+          <AvatarWithShimmer
+            key={profile.avatar}
+            src={profile.avatar}
+            alt={profile.displayName || profile.handle}
+          />
+        ) : (
+          <div className="w-30 h-30 bg-accent flex items-center justify-center text-4xl text-white font-bold shadow-lg shadow-accent-subtle">
+            {profile.handle[0].toUpperCase()}
+          </div>
+        )}
+
+        {/* Profile Info */}
+        <div className="text-center">
+          <h1 className="text-2xl m-0 mb-1">
+            {profile.displayName || `@${profile.handle}`}
+          </h1>
+          {profile.displayName && (
+            <div className="text-sm text-muted m-0 mb-3">@{profile.handle}</div>
+          )}
+          {profile.description && (
+            <div className="text-sm leading-relaxed text-muted m-0">
+              {profile.description}
             </div>
           )}
         </div>
 
-        <h1 className="profile-name">{profile.displayName || profile.handle}</h1>
-        <p className="profile-handle">@{profile.handle}</p>
-
-        {profile.profile?.description && (
-          <p className="profile-bio">{profile.profile.description}</p>
+        {/* Verification Summary */}
+        {activeProofs.length > 0 && (
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 text-green-400 border border-green-500/30 text-sm font-semibold">
+            <span>✓</span>
+            <span>
+              {activeProofs.length} verified {activeProofs.length === 1 ? "account" : "accounts"}
+            </span>
+          </div>
         )}
 
-        <div className="verification-summary">
-          <span className="verified-badge">
-            ✓ {verifiedProofsCount} Verified Account{verifiedProofsCount !== 1 ? 's' : ''}
-          </span>
-        </div>
-      </div>
-
-      {/* Verified Accounts Grid (LinkTree-style) */}
-      <div className="accounts-grid">
-        {profile.proofs.length === 0 ? (
-          <div className="empty-state">
-            <p>No verified accounts yet.</p>
+        {/* Verified Accounts Grid */}
+        {activeProofs.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+            {activeProofs.map((proof) => (
+              <SimpleProofCard key={proof.uri} proof={proof} />
+            ))}
           </div>
         ) : (
-          profile.proofs.map((proof: any) => (
-            <SimpleProofCard key={proof.uri} proof={proof} />
-          ))
+          <div className="text-center py-8 text-muted">
+            <p className="text-lg mb-1">No verified accounts yet</p>
+            <p className="text-sm">
+              This user hasn't linked any external accounts.
+            </p>
+          </div>
         )}
-      </div>
 
-      {/* Footer */}
-      <div className="profile-footer">
-        <Link to={`/${identifier}/details`} className="details-link">
-          🔍 View Technical Details →
-        </Link>
-        
-        <button 
-          className="share-button"
-          onClick={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Profile link copied to clipboard!');
-          }}
-        >
-          📋 Share Profile
-        </button>
+        {/* Footer */}
+        <div className="flex flex-col items-center gap-3 mt-6 pt-6 border-t border-surface-border w-full">
+          <Link
+            to={`/${profile.handle}/details`}
+            className="text-accent font-semibold hover:underline"
+          >
+            View technical details →
+          </Link>
+          <button
+            onClick={handleShare}
+            className="px-4 py-2 rounded-lg border border-surface-border bg-surface text-sm cursor-pointer hover:border-muted transition-colors"
+          >
+            Share profile
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
-}
-```
-
-**CSS for Simple Profile:** Add to `src/index.css`:
-
-```css
-.profile-page.simple {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  text-align: center;
-}
-
-.profile-avatar-large {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 1rem;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 4px solid #eee;
-}
-
-.profile-avatar-large img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.avatar-placeholder-large {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-size: 3rem;
-  font-weight: bold;
-}
-
-.profile-name {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0.5rem 0 0.25rem;
-}
-
-.profile-handle {
-  font-size: 1.1rem;
-  color: #666;
-  margin: 0;
-}
-
-.profile-bio {
-  margin: 1rem 0;
-  color: #444;
-  line-height: 1.6;
-}
-
-.verification-summary {
-  margin: 1.5rem 0;
-}
-
-.verified-badge {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  background: #e6ffe6;
-  color: #00aa00;
-  border-radius: 24px;
-  font-weight: 600;
-  border: 2px solid #00aa00;
-}
-
-.accounts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-  margin: 2rem 0;
-}
-
-.profile-footer {
-  margin-top: 3rem;
-  padding-top: 2rem;
-  border-top: 1px solid #eee;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-items: center;
-}
-
-.details-link {
-  color: #0066cc;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.details-link:hover {
-  text-decoration: underline;
-}
-
-.share-button {
-  background: none;
-  border: 1px solid #ddd;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.share-button:hover {
-  background: #f5f5f5;
-  border-color: #999;
 }
 ```
 
 ---
 
-## Task 4.2: Simple Proof Card Component (LinkTree-Style)
+## Task 4.2: Simple Proof Card Component
 
 ### Location
 Create file: `src/components/Profile/SimpleProofCard.tsx`
@@ -297,182 +313,80 @@ Create file: `src/components/Profile/SimpleProofCard.tsx`
 ### Implementation
 
 ```typescript
-import React from 'react';
+import type { AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestProof } from "../../../types/lexicons";
 
 interface SimpleProofCardProps {
-  proof: any;
+  proof: AtProtoRecord<MeAttestProof.Main>;
+}
+
+const SERVICE_ICONS: Record<string, string> = {
+  github: "🐙",
+  twitter: "🐦",
+};
+
+const SERVICE_NAMES: Record<string, string> = {
+  github: "GitHub",
+  twitter: "Twitter / X",
+};
+
+function getTargetUrl(proof: MeAttestProof.Main): string | undefined {
+  switch (proof.service) {
+    case "github":
+      return `https://github.com/${proof.handle}`;
+    case "twitter":
+      return `https://x.com/${proof.handle.replace(/^@/, "")}`;
+    default:
+      return undefined;
+  }
 }
 
 export function SimpleProofCard({ proof }: SimpleProofCardProps) {
-  const getServiceIcon = () => {
-    const service = proof.service;
-    const icons: Record<string, string> = {
-      github: '🐙',
-      twitter: '🐦',
-      dns: '🌐',
-      https: '🔒',
-      ethereum: '💎',
-      bitcoin: '₿',
-      solana: '◎',
-      mastodon: '🦣',
-      reddit: '🤖',
-      hackernews: '🟧',
-      linkedin: '💼',
-    };
-    return icons[service] || '🔗';
-  };
+  const { value } = proof;
+  const icon = SERVICE_ICONS[value.service] || "🔗";
+  const serviceName = SERVICE_NAMES[value.service] || value.service;
+  const targetUrl = getTargetUrl(value);
+  const isActive = value.status !== "retracted";
 
-  const getServiceName = () => {
-    const nameMap: Record<string, string> = {
-      github: 'GitHub',
-      twitter: 'Twitter/X',
-      dns: 'DNS',
-      https: 'Website',
-      ethereum: 'Ethereum',
-      bitcoin: 'Bitcoin',
-      solana: 'Solana',
-      mastodon: 'Mastodon',
-      reddit: 'Reddit',
-      hackernews: 'Hacker News',
-      linkedin: 'LinkedIn',
-    };
-    return nameMap[proof.service] || proof.service;
-  };
-
-  const getTargetUrl = () => {
-    // For service proofs, link to the actual service profile
-    switch (proof.service) {
-      case 'github':
-        return `https://github.com/${proof.handle}`;
-      case 'twitter':
-        return `https://twitter.com/${proof.handle}`;
-      case 'reddit':
-        return `https://reddit.com/u/${proof.handle}`;
-      case 'hackernews':
-        return `https://news.ycombinator.com/user?id=${proof.handle}`;
-      case 'linkedin':
-        return `https://linkedin.com/in/${proof.handle}`;
-      case 'mastodon':
-        return proof.proofUrl; // Mastodon profiles vary by instance
-      case 'ethereum':
-        return `https://etherscan.io/address/${proof.handle}`;
-      case 'bitcoin':
-        return `https://blockstream.info/address/${proof.handle}`;
-      case 'solana':
-        return `https://solscan.io/account/${proof.handle}`;
-      case 'dns':
-      case 'https':
-        return proof.proofUrl;
-      default:
-        return proof.proofUrl || '#';
-    }
-  };
-
-  const isVerified = proof.status === 'verified';
-
-  return (
-    <a 
-      href={getTargetUrl()} 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className={`simple-proof-card ${isVerified ? 'verified' : 'unverified'}`}
+  const content = (
+    <div
+      className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
+        isActive
+          ? "border-green-500/40 bg-green-500/5 hover:shadow-green-500/10"
+          : "border-yellow-500/40 bg-yellow-500/5 hover:shadow-yellow-500/10"
+      }`}
     >
-      <div className="card-icon">{getServiceIcon()}</div>
-      <div className="card-content">
-        <div className="card-service-name">{getServiceName()}</div>
-        <div className="card-handle">{proof.handle || proof.identifier}</div>
+      {/* Service Icon */}
+      <span className="text-3xl shrink-0">{icon}</span>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 text-left">
+        <div className="font-semibold text-sm">{serviceName}</div>
+        <div className="text-muted text-sm truncate">{value.handle}</div>
       </div>
-      <div className="card-status">
-        {isVerified ? (
-          <span className="status-badge verified">✓</span>
-        ) : (
-          <span className="status-badge unverified">⚠</span>
-        )}
+
+      {/* Status Badge */}
+      <div
+        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+          isActive
+            ? "bg-green-500 text-white"
+            : "bg-yellow-500 text-white"
+        }`}
+      >
+        {isActive ? "✓" : "⚠"}
       </div>
-    </a>
+    </div>
   );
-}
-```
 
-**CSS:** Add to `src/index.css`:
+  if (targetUrl) {
+    return (
+      <a href={targetUrl} target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">
+        {content}
+      </a>
+    );
+  }
 
-```css
-.simple-proof-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.25rem;
-  background: white;
-  border: 2px solid #eee;
-  border-radius: 12px;
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.simple-proof-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.simple-proof-card.verified {
-  border-color: #00aa00;
-  background: #fafffe;
-}
-
-.simple-proof-card.unverified {
-  border-color: #ffaa00;
-  background: #fffef9;
-}
-
-.card-icon {
-  font-size: 2.5rem;
-  flex-shrink: 0;
-}
-
-.card-content {
-  flex: 1;
-  text-align: left;
-  min-width: 0;
-}
-
-.card-service-name {
-  font-weight: 600;
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
-}
-
-.card-handle {
-  font-size: 0.9rem;
-  color: #666;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-status {
-  flex-shrink: 0;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 1.2rem;
-}
-
-.status-badge.verified {
-  background: #00aa00;
-  color: white;
-}
-
-.status-badge.unverified {
-  background: #ffaa00;
-  color: white;
+  return content;
 }
 ```
 
@@ -486,1041 +400,379 @@ Create file: `src/pages/ProfileDetailsPage.tsx`
 ### Implementation
 
 ```typescript
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { DetailedProofCard } from '../components/Profile/DetailedProofCard';
-import { KeyCard } from '../components/Profile/KeyCard';
-import { StatementCard } from '../components/Profile/StatementCard';
-import { VerificationReport } from '../components/Profile/VerificationReport';
+import type { LoaderFunctionArgs } from "react-router";
+import { useLoaderData, Link } from "react-router";
+import { useState } from "react";
+import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
+import { DetailedProofCard } from "@/components/Profile/DetailedProofCard";
+import { KeyCard } from "@/components/Profile/KeyCard";
+import { NotFoundContent } from "./NotFoundPage";
+import { getProfile } from "@/lib/bsky";
+import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
 
-interface ProfileData {
-  did: string;
+interface ProfileDetailsData {
   handle: string;
+  did: string;
   displayName?: string;
+  description?: string;
   avatar?: string;
-  proofs: any[];
-  keys: any[];
-  statements: any[];
-  profile?: any;
+  isValid: boolean;
+  proofs: AtProtoRecord<MeAttestProof.Main>[];
+  keys: AtProtoRecord<MeAttestKey.Main>[];
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function profileDetailsLoader({
+  params,
+}: LoaderFunctionArgs): Promise<ProfileDetailsData> {
+  const handle = params.handle;
+
+  if (!handle) {
+    return { handle: "", did: "", isValid: false, proofs: [], keys: [] };
+  }
+
+  const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
+
+  try {
+    const profile = await getProfile(cleanHandle);
+    if (!profile) {
+      return { handle: cleanHandle, did: "", isValid: false, proofs: [], keys: [] };
+    }
+
+    const [proofs, keys] = await Promise.all([
+      listProofs(profile.did).catch(() => []),
+      listKeys(profile.did).catch(() => []),
+    ]);
+
+    return {
+      handle: profile.handle,
+      did: profile.did,
+      displayName: profile.displayName,
+      description: profile.description,
+      avatar: profile.avatar,
+      isValid: true,
+      proofs,
+      keys,
+    };
+  } catch (error) {
+    console.error("[ProfileDetailsLoader] Error fetching profile:", error);
+    return { handle: cleanHandle, did: "", isValid: false, proofs: [], keys: [] };
+  }
 }
 
 export function ProfileDetailsPage() {
-  const { identifier } = useParams<{ identifier: string }>();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'proofs' | 'keys' | 'statements'>('proofs');
-  const [reverifyingAll, setReverifyingAll] = useState(false);
+  const profile = useLoaderData() as ProfileDetailsData;
+  const [activeTab, setActiveTab] = useState<"proofs" | "keys">("proofs");
+  const [copiedDid, setCopiedDid] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-  }, [identifier]);
-
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/profile/${identifier}`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load profile');
-      }
-
-      const data = await response.json();
-      setProfile(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReverifyAll = async () => {
-    if (!profile) return;
-
-    setReverifyingAll(true);
-
-    try {
-      // Re-verify all proofs
-      await Promise.all(
-        profile.proofs.map((proof) =>
-          fetch('/api/proofs/verify-cached', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ uri: proof.uri }),
-          })
-        )
-      );
-
-      // Reload profile
-      await loadProfile();
-      alert('All proofs re-verified successfully!');
-    } catch (err: any) {
-      alert(`Re-verification failed: ${err.message}`);
-    } finally {
-      setReverifyingAll(false);
-    }
-  };
-
-  const copyDID = () => {
-    if (profile) {
-      navigator.clipboard.writeText(profile.did);
-      alert('DID copied to clipboard!');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="profile-details-page loading">
-        <div className="spinner">Loading profile...</div>
-      </div>
-    );
+  if (!profile.isValid) {
+    return <NotFoundContent />;
   }
 
-  if (error) {
-    return (
-      <div className="profile-details-page error">
-        <h2>Error</h2>
-        <p>{error}</p>
-      </div>
-    );
-  }
+  const activeProofs = profile.proofs.filter(
+    (p) => p.value.status !== "retracted",
+  );
+  const activeKeys = profile.keys.filter(
+    (k) => k.value.status !== "revoked",
+  );
 
-  if (!profile) {
-    return (
-      <div className="profile-details-page not-found">
-        <h2>Profile Not Found</h2>
-        <p>The user {identifier} could not be found.</p>
-      </div>
-    );
-  }
-
-  const verifiedProofsCount = profile.proofs.filter((p) => p.status === 'verified').length;
-  const totalProofsCount = profile.proofs.length;
+  const copyDid = async () => {
+    await navigator.clipboard.writeText(profile.did);
+    setCopiedDid(true);
+    setTimeout(() => setCopiedDid(false), 2000);
+  };
 
   return (
-    <div className="profile-details-page">
+    <div className="max-w-4xl mx-auto w-full">
       {/* Back Link */}
-      <div className="back-link">
-        <Link to={`/${identifier}`}>← Back to Simple Profile</Link>
+      <div className="mb-6">
+        <Link
+          to={`/${profile.handle}`}
+          className="text-accent text-sm font-semibold hover:underline"
+        >
+          ← Simple view
+        </Link>
       </div>
 
       {/* Profile Header */}
-      <div className="profile-header-technical">
-        <div className="profile-avatar">
+      <div className="flex flex-col sm:flex-row gap-6 mb-8 pb-8 border-b-2 border-surface-border">
+        {/* Avatar */}
+        <div className="shrink-0 self-center sm:self-start">
           {profile.avatar ? (
-            <img src={profile.avatar} alt={profile.displayName || profile.handle} />
+            <AvatarWithShimmer
+              key={profile.avatar}
+              src={profile.avatar}
+              alt={profile.displayName || profile.handle}
+            />
           ) : (
-            <div className="avatar-placeholder">
-              {(profile.displayName || profile.handle).charAt(0).toUpperCase()}
+            <div className="w-24 h-24 bg-accent rounded-full flex items-center justify-center text-3xl text-white font-bold">
+              {profile.handle[0].toUpperCase()}
             </div>
           )}
         </div>
 
-        <div className="profile-info">
-          <h1>{profile.displayName || profile.handle}</h1>
-          <p className="handle">@{profile.handle}</p>
-          
-          <div className="did-section">
-            <label>DID (Decentralized Identifier):</label>
-            <div className="did-display">
-              <code>{profile.did}</code>
-              <button className="btn-icon" onClick={copyDID} title="Copy DID">
-                📋
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl m-0 mb-1">
+            {profile.displayName || `@${profile.handle}`}
+          </h1>
+          {profile.displayName && (
+            <p className="text-muted m-0 mb-4">@{profile.handle}</p>
+          )}
+
+          {/* DID */}
+          <div className="p-3 bg-surface rounded-lg border border-surface-border mb-4">
+            <label className="block text-xs font-semibold text-muted mb-1">
+              Decentralized Identifier (DID)
+            </label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono break-all p-2 bg-page rounded border border-surface-border">
+                {profile.did}
+              </code>
+              <button
+                onClick={copyDid}
+                className="shrink-0 px-3 py-1.5 text-xs border border-surface-border rounded bg-surface hover:bg-page transition-colors cursor-pointer"
+              >
+                {copiedDid ? "Copied!" : "Copy"}
               </button>
             </div>
           </div>
 
-          <div className="verification-stats">
-            <span className="stat">
-              <strong>{verifiedProofsCount}</strong> / {totalProofsCount} proofs verified
+          {/* Stats */}
+          <div className="flex gap-6 text-sm text-muted">
+            <span>
+              <strong className="text-white">{activeProofs.length}</strong>{" "}
+              {activeProofs.length === 1 ? "proof" : "proofs"}
             </span>
-            <span className="stat">
-              <strong>{profile.keys.length}</strong> public keys
+            <span>
+              <strong className="text-white">{activeKeys.length}</strong>{" "}
+              {activeKeys.length === 1 ? "key" : "keys"}
             </span>
-            <span className="stat">
-              <strong>{profile.statements.length}</strong> signed statements
-            </span>
-          </div>
-
-          <div className="profile-actions">
-            <button 
-              className="btn-primary" 
-              onClick={handleReverifyAll}
-              disabled={reverifyingAll || profile.proofs.length === 0}
-            >
-              {reverifyingAll ? 'Re-verifying...' : '🔄 Re-verify All Proofs'}
-            </button>
-            
-            <VerificationReport profile={profile} />
-            
-            <button 
-              className="btn-secondary" 
-              onClick={() => window.open(`/api/keys/${identifier}/ssh`, '_blank')}
-            >
-              View SSH Keys
-            </button>
-            
-            <button 
-              className="btn-secondary" 
-              onClick={() => window.open(`/api/keys/${identifier}/pgp`, '_blank')}
-            >
-              View PGP Keys
-            </button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="profile-tabs">
+      <div className="flex gap-1 mb-6 border-b-2 border-surface-border">
         <button
-          className={activeTab === 'proofs' ? 'active' : ''}
-          onClick={() => setActiveTab('proofs')}
+          onClick={() => setActiveTab("proofs")}
+          className={`px-4 py-3 text-sm font-semibold border-b-3 -mb-0.5 transition-colors cursor-pointer bg-transparent ${
+            activeTab === "proofs"
+              ? "text-accent border-accent"
+              : "text-muted border-transparent hover:text-white"
+          }`}
         >
-          Proofs ({profile.proofs.length})
+          Proofs ({activeProofs.length})
         </button>
         <button
-          className={activeTab === 'keys' ? 'active' : ''}
-          onClick={() => setActiveTab('keys')}
+          onClick={() => setActiveTab("keys")}
+          className={`px-4 py-3 text-sm font-semibold border-b-3 -mb-0.5 transition-colors cursor-pointer bg-transparent ${
+            activeTab === "keys"
+              ? "text-accent border-accent"
+              : "text-muted border-transparent hover:text-white"
+          }`}
         >
-          Public Keys ({profile.keys.length})
-        </button>
-        <button
-          className={activeTab === 'statements' ? 'active' : ''}
-          onClick={() => setActiveTab('statements')}
-        >
-          Statements ({profile.statements.length})
+          Keys ({activeKeys.length})
         </button>
       </div>
 
       {/* Tab Content */}
-      <div className="profile-content">
-        {activeTab === 'proofs' && (
-          <div className="proofs-list">
-            {profile.proofs.length === 0 ? (
-              <div className="empty-state">
-                <p>No proofs have been added yet.</p>
-              </div>
-            ) : (
-              profile.proofs.map((proof: any) => (
-                <DetailedProofCard key={proof.uri} proof={proof} onUpdate={loadProfile} />
-              ))
-            )}
-          </div>
-        )}
+      {activeTab === "proofs" && (
+        <div className="flex flex-col gap-4">
+          {activeProofs.length > 0 ? (
+            activeProofs.map((proof) => (
+              <DetailedProofCard key={proof.uri} proof={proof} />
+            ))
+          ) : (
+            <div className="text-center py-12 text-muted">
+              <p className="text-lg mb-1">No proofs found</p>
+              <p className="text-sm">
+                This user hasn't published any identity proofs yet.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-        {activeTab === 'keys' && (
-          <div className="keys-list">
-            {profile.keys.length === 0 ? (
-              <div className="empty-state">
-                <p>No public keys have been published yet.</p>
-              </div>
-            ) : (
-              profile.keys.map((key: any) => (
-                <KeyCard key={key.uri} keyData={key} />
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'statements' && (
-          <div className="statements-list">
-            {profile.statements.length === 0 ? (
-              <div className="empty-state">
-                <p>No signed statements yet.</p>
-              </div>
-            ) : (
-              profile.statements.map((statement: any) => (
-                <StatementCard key={statement.uri} statement={statement} />
-              ))
-            )}
-          </div>
-        )}
-      </div>
+      {activeTab === "keys" && (
+        <div className="flex flex-col gap-4">
+          {activeKeys.length > 0 ? (
+            activeKeys.map((key) => (
+              <KeyCard key={key.uri} keyRecord={key} />
+            ))
+          ) : (
+            <div className="text-center py-12 text-muted">
+              <p className="text-lg mb-1">No keys published</p>
+              <p className="text-sm">
+                This user hasn't published any public keys yet.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 ```
 
-**CSS for Technical Details Profile:** Add to `src/index.css`:
-
-```css
-.profile-details-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-.back-link {
-  margin-bottom: 1.5rem;
-}
-
-.back-link a {
-  color: #0066cc;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.back-link a:hover {
-  text-decoration: underline;
-}
-
-.profile-header-technical {
-  display: flex;
-  gap: 2rem;
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
-  border-bottom: 2px solid #eee;
-}
-
-.profile-avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid #ddd;
-  flex-shrink: 0;
-}
-
-.profile-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-size: 2.5rem;
-  font-weight: bold;
-}
-
-.profile-info {
-  flex: 1;
-}
-
-.profile-info h1 {
-  font-size: 2rem;
-  margin: 0 0 0.5rem;
-}
-
-.profile-info .handle {
-  font-size: 1.2rem;
-  color: #666;
-  margin: 0 0 1rem;
-}
-
-.did-section {
-  margin: 1rem 0;
-  padding: 1rem;
-  background: #f5f5f5;
-  border-radius: 8px;
-}
-
-.did-section label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.did-display {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.did-display code {
-  flex: 1;
-  padding: 0.5rem;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 0.85rem;
-  word-break: break-all;
-}
-
-.btn-icon {
-  background: none;
-  border: 1px solid #ddd;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: #e6e6e6;
-  border-color: #999;
-}
-
-.verification-stats {
-  display: flex;
-  gap: 2rem;
-  margin: 1.5rem 0;
-  font-size: 0.95rem;
-}
-
-.verification-stats .stat {
-  color: #666;
-}
-
-.verification-stats .stat strong {
-  color: #000;
-  font-size: 1.2rem;
-}
-
-.profile-actions {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-top: 1.5rem;
-}
-
-.btn-primary {
-  background: #0066cc;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0052a3;
-}
-
-.btn-primary:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: white;
-  color: #0066cc;
-  border: 2px solid #0066cc;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-  background: #e6f2ff;
-}
-
-.profile-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  border-bottom: 2px solid #eee;
-}
-
-.profile-tabs button {
-  background: none;
-  border: none;
-  padding: 1rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: #666;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  transition: all 0.2s;
-}
-
-.profile-tabs button:hover {
-  color: #000;
-}
-
-.profile-tabs button.active {
-  color: #0066cc;
-  border-bottom-color: #0066cc;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: #666;
-}
-
-.empty-state p {
-  font-size: 1.1rem;
-}
-```
-
 ---
 
-## Task 4.4: Detailed Proof Card (for Technical View)
+## Task 4.4: Detailed Proof Card Component
 
 ### Location
 Create file: `src/components/Profile/DetailedProofCard.tsx`
 
 ### Implementation
 
-This is the same as the ProofCard from earlier, but renamed for clarity. It includes the full technical details, client-side replay, and server verification badges.
-
 ```typescript
-import React, { useState } from 'react';
-import { ProofReplayVerification } from '../ProofReplayVerification';
-import { ServerVerificationBadge } from '../ServerVerificationBadge';
+import { useState } from "react";
+import type { AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestProof } from "../../../types/lexicons";
+import { ProofReplayVerification } from "./ProofReplayVerification";
 
 interface DetailedProofCardProps {
-  proof: any;
-  onUpdate?: () => void;
+  proof: AtProtoRecord<MeAttestProof.Main>;
 }
 
-export function DetailedProofCard({ proof, onUpdate }: DetailedProofCardProps) {
-  const [reverifying, setReverifying] = useState(false);
+const SERVICE_ICONS: Record<string, string> = {
+  github: "🐙",
+  twitter: "🐦",
+};
+
+const SERVICE_NAMES: Record<string, string> = {
+  github: "GitHub",
+  twitter: "Twitter / X",
+};
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function DetailedProofCard({ proof }: DetailedProofCardProps) {
+  const { value } = proof;
   const [expanded, setExpanded] = useState(false);
 
-  const getStatusBadge = () => {
-    switch (proof.status) {
-      case 'verified':
-        return <span className="badge badge-verified">✓ Verified</span>;
-      case 'unverified':
-        return <span className="badge badge-unverified">⚠ Unverified</span>;
-      case 'revoked':
-        return <span className="badge badge-revoked">✗ Revoked</span>;
-      case 'expired':
-        return <span className="badge badge-expired">⌛ Expired</span>;
-      default:
-        return <span className="badge badge-pending">⋯ Pending</span>;
-    }
-  };
-
-  const getServiceIcon = () => {
-    const service = proof.service;
-    const icons: Record<string, string> = {
-      github: '🐙',
-      twitter: '🐦',
-      dns: '🌐',
-      https: '🔒',
-      ethereum: '💎',
-      bitcoin: '₿',
-      solana: '◎',
-    };
-    return icons[service] || '🔗';
-  };
-
-  const handleReverify = async () => {
-    if (!proof.uri) return;
-
-    setReverifying(true);
-
-    try {
-      const response = await fetch('/api/proofs/reverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ uri: proof.uri }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Re-verification failed');
-      }
-
-      if (onUpdate) {
-        onUpdate();
-      }
-    } catch (err: any) {
-      alert(`Re-verification failed: ${err.message}`);
-    } finally {
-      setReverifying(false);
-    }
-  };
-
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const icon = SERVICE_ICONS[value.service] || "🔗";
+  const serviceName = SERVICE_NAMES[value.service] || value.service;
+  const isActive = value.status !== "retracted";
 
   return (
-    <div className={`proof-card proof-${proof.status}`}>
-      <div className="proof-header">
-        <div className="proof-service">
-          <span className="service-icon">{getServiceIcon()}</span>
-          <span className="service-name">{proof.service}</span>
+    <div
+      className={`rounded-lg border p-4 transition-shadow hover:shadow-md ${
+        isActive
+          ? "border-l-4 border-l-green-500 border-surface-border"
+          : "border-l-4 border-l-red-500 border-surface-border opacity-70"
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{icon}</span>
+          <span className="font-semibold">{serviceName}</span>
         </div>
-        {getStatusBadge()}
+        <span
+          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+            isActive
+              ? "bg-green-500/10 text-green-400"
+              : "bg-red-500/10 text-red-400"
+          }`}
+        >
+          {isActive ? "✓ Active" : "✗ Retracted"}
+        </span>
       </div>
 
-      <div className="proof-identity">
-        <strong>{proof.handle || proof.identifier}</strong>
-      </div>
+      {/* Identity */}
+      <p className="text-sm mb-1">
+        <span className="text-muted">Handle:</span>{" "}
+        <span className="font-medium">{value.handle}</span>
+      </p>
 
-      {proof.proofUrl && (
-        <div className="proof-url">
-          <a href={proof.proofUrl} target="_blank" rel="noopener noreferrer">
-            {proof.proofUrl}
+      {/* Proof URL */}
+      {value.proofUrl && (
+        <p className="text-sm mb-1">
+          <span className="text-muted">Proof:</span>{" "}
+          <a
+            href={value.proofUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline text-xs break-all"
+          >
+            {value.proofUrl}
           </a>
-        </div>
+        </p>
       )}
 
-      <div className="proof-dates">
-        <span>Created: {formatDate(proof.createdAt)}</span>
-        {proof.verifiedAt && <span>Verified: {formatDate(proof.verifiedAt)}</span>}
-        {proof.lastCheckedAt && <span>Last checked: {formatDate(proof.lastCheckedAt)}</span>}
-      </div>
-
-      <div className="proof-actions">
-        <button className="btn-link" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Hide Details' : 'Show Details'}
-        </button>
-
-        {proof.status === 'verified' && (
-          <button className="btn-link" onClick={handleReverify} disabled={reverifying}>
-            {reverifying ? 'Re-verifying...' : 'Re-verify'}
-          </button>
+      {/* Dates */}
+      <div className="flex gap-4 text-xs text-muted mt-2">
+        <span>Created: {formatDate(value.createdAt)}</span>
+        {value.retractedAt && (
+          <span>Retracted: {formatDate(value.retractedAt)}</span>
         )}
       </div>
 
+      {/* Actions */}
+      <div className="flex gap-3 mt-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </button>
+      </div>
+
+      {/* Expanded Details */}
       {expanded && (
-        <div className="proof-details">
-          <dl>
-            <dt>URI:</dt>
-            <dd style={{ fontFamily: 'monospace', fontSize: '0.85em', wordBreak: 'break-all' }}>
-              {proof.uri}
-            </dd>
-
-            {proof.serverVerification && (
-              <>
-                <dt>Server Verification:</dt>
-                <dd>
-                  Result: {proof.serverVerification.result ? '✓ Verified' : '✗ Failed'}
-                  <br />
-                  Verified at: {new Date(proof.serverVerification.verifiedAt).toLocaleString()}
-                  <br />
-                  Expires: {new Date(proof.serverVerification.expiresAt).toLocaleString()}
+        <div className="mt-4 pt-4 border-t border-surface-border">
+          <dl className="text-xs space-y-3">
+            <div>
+              <dt className="font-semibold text-muted mb-0.5">Record URI</dt>
+              <dd className="font-mono break-all bg-page p-2 rounded border border-surface-border">
+                {proof.uri}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted mb-0.5">CID</dt>
+              <dd className="font-mono break-all bg-page p-2 rounded border border-surface-border">
+                {proof.cid}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-muted mb-0.5">Nonce</dt>
+              <dd className="font-mono bg-page p-2 rounded border border-surface-border">
+                {value.nonce}
+              </dd>
+            </div>
+            {value.challengeText && (
+              <div>
+                <dt className="font-semibold text-muted mb-0.5">Challenge Text</dt>
+                <dd className="font-mono whitespace-pre-wrap bg-page p-2 rounded border border-surface-border">
+                  {value.challengeText}
                 </dd>
-              </>
-            )}
-
-            {proof.errorMessage && (
-              <>
-                <dt>Error:</dt>
-                <dd style={{ color: '#cc0000' }}>{proof.errorMessage}</dd>
-              </>
-            )}
-
-            {proof.signature && (
-              <>
-                <dt>Signature:</dt>
-                <dd style={{ fontFamily: 'monospace', fontSize: '0.75em', wordBreak: 'break-all' }}>
-                  {proof.signature}
-                </dd>
-              </>
-            )}
-
-            {proof.challengeText && (
-              <>
-                <dt>Challenge Text:</dt>
-                <dd style={{ fontFamily: 'monospace', fontSize: '0.85em', whiteSpace: 'pre-wrap' }}>
-                  {proof.challengeText}
-                </dd>
-              </>
+              </div>
             )}
           </dl>
 
-          {/* Import verification components from Phase 2 */}
-          <div className="verification-methods" style={{ marginTop: '1.5rem' }}>
-            <h4>Verification Methods</h4>
-            
-            {/* Client-side replay verification */}
-            <ProofReplayVerification proof={proof} />
-
-            {/* Server-side cached verification */}
-            <div style={{ marginTop: '1rem' }}>
-              <ServerVerificationBadge proof={proof} onUpdate={onUpdate} />
+          {/* Client-Side Re-Verification */}
+          {isActive && (
+            <div className="mt-4">
+              <ProofReplayVerification proof={proof} />
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
   );
-}
-```
-
-**CSS:** Add to `src/index.css`:
-
-```css
-.proof-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  transition: box-shadow 0.2s;
-}
-
-## Task 4.2: Proof Card Component with Status Badges
-
-### Location
-Create file: `src/components/Profile/ProofCard.tsx`
-
-### Implementation
-
-```typescript
-import React, { useState } from 'react';
-
-interface ProofCardProps {
-  proof: any;
-  onUpdate?: () => void;
-}
-
-export function ProofCard({ proof, onUpdate }: ProofCardProps) {
-  const [reverifying, setReverifying] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const getStatusBadge = () => {
-    switch (proof.status) {
-      case 'verified':
-        return <span className="badge badge-verified">✓ Verified</span>;
-      case 'unverified':
-        return <span className="badge badge-unverified">⚠ Unverified</span>;
-      case 'revoked':
-        return <span className="badge badge-revoked">✗ Revoked</span>;
-      case 'expired':
-        return <span className="badge badge-expired">⌛ Expired</span>;
-      default:
-        return <span className="badge badge-pending">⋯ Pending</span>;
-    }
-  };
-
-  const getServiceIcon = () => {
-    const service = proof.service;
-    const icons: Record<string, string> = {
-      github: '🐙',
-      twitter: '🐦',
-      dns: '🌐',
-      https: '🔒',
-      ethereum: '💎',
-      bitcoin: '₿',
-      solana: '◎',
-    };
-    return icons[service] || '🔗';
-  };
-
-  const handleReverify = async () => {
-    if (!proof.uri) return;
-
-    setReverifying(true);
-
-    try {
-      const response = await fetch('/api/proofs/reverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ uri: proof.uri }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Re-verification failed');
-      }
-
-      // Reload profile
-      if (onUpdate) {
-        onUpdate();
-      }
-    } catch (err: any) {
-      alert(`Re-verification failed: ${err.message}`);
-    } finally {
-      setReverifying(false);
-    }
-  };
-
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  return (
-    <div className={`proof-card proof-${proof.status}`}>
-      <div className="proof-header">
-        <div className="proof-service">
-          <span className="service-icon">{getServiceIcon()}</span>
-          <span className="service-name">{proof.service}</span>
-        </div>
-        {getStatusBadge()}
-      </div>
-
-      <div className="proof-identity">
-        <strong>{proof.handle || proof.identifier}</strong>
-      </div>
-
-      {proof.proofUrl && (
-        <div className="proof-url">
-          <a href={proof.proofUrl} target="_blank" rel="noopener noreferrer">
-            {proof.proofUrl}
-          </a>
-        </div>
-      )}
-
-      <div className="proof-dates">
-        <span>Created: {formatDate(proof.createdAt)}</span>
-        {proof.verifiedAt && <span>Verified: {formatDate(proof.verifiedAt)}</span>}
-        {proof.lastCheckedAt && <span>Last checked: {formatDate(proof.lastCheckedAt)}</span>}
-      </div>
-
-      <div className="proof-actions">
-        <button className="btn-link" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Hide Details' : 'Show Details'}
-        </button>
-
-        {proof.status === 'verified' && (
-          <button className="btn-link" onClick={handleReverify} disabled={reverifying}>
-            {reverifying ? 'Re-verifying...' : 'Re-verify'}
-          </button>
-        )}
-      </div>
-
-      {expanded && (
-        <div className="proof-details">
-          <dl>
-            <dt>URI:</dt>
-            <dd style={{ fontFamily: 'monospace', fontSize: '0.85em', wordBreak: 'break-all' }}>
-              {proof.uri}
-            </dd>
-
-            {proof.serverVerification && (
-              <>
-                <dt>Server Verification:</dt>
-                <dd>
-                  Result: {proof.serverVerification.result ? '✓ Verified' : '✗ Failed'}
-                  <br />
-                  Verified at: {new Date(proof.serverVerification.verifiedAt).toLocaleString()}
-                  <br />
-                  Expires: {new Date(proof.serverVerification.expiresAt).toLocaleString()}
-                </dd>
-              </>
-            )}
-
-            {proof.errorMessage && (
-              <>
-                <dt>Error:</dt>
-                <dd style={{ color: '#cc0000' }}>{proof.errorMessage}</dd>
-              </>
-            )}
-
-            {proof.signature && (
-              <>
-                <dt>Signature:</dt>
-                <dd style={{ fontFamily: 'monospace', fontSize: '0.75em', wordBreak: 'break-all' }}>
-                  {proof.signature}
-                </dd>
-              </>
-            )}
-
-            {proof.challengeText && (
-              <>
-                <dt>Challenge Text:</dt>
-                <dd style={{ fontFamily: 'monospace', fontSize: '0.85em', whiteSpace: 'pre-wrap' }}>
-                  {proof.challengeText}
-                </dd>
-              </>
-            )}
-          </dl>
-
-          {/* Import verification components from Phase 2 */}
-          <div className="verification-methods" style={{ marginTop: '1.5rem' }}>
-            <h4>Verification Methods</h4>
-            
-            {/* Client-side replay verification */}
-            <ProofReplayVerification proof={proof} />
-
-            {/* Server-side cached verification */}
-            <div style={{ marginTop: '1rem' }}>
-              <ServerVerificationBadge proof={proof} onUpdate={onUpdate} />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-**Imports:** Add to top of ProofCard.tsx:
-
-```typescript
-import { ProofReplayVerification } from '../ProofReplayVerification';
-import { ServerVerificationBadge } from '../ServerVerificationBadge';
-```
-
-**CSS:** Add to `src/index.css` or component stylesheet:
-
-```css
-.proof-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  transition: box-shadow 0.2s;
-}
-
-.proof-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.proof-card.proof-verified {
-  border-left: 4px solid #00cc00;
-}
-
-.proof-card.proof-unverified {
-  border-left: 4px solid #ff9900;
-}
-
-.proof-card.proof-revoked {
-  border-left: 4px solid #cc0000;
-  opacity: 0.7;
-}
-
-.proof-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.proof-service {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.service-icon {
-  font-size: 1.5em;
-}
-
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-}
-
-.badge-verified {
-  background: #e6ffe6;
-  color: #00aa00;
-}
-
-.badge-unverified {
-  background: #fff4e6;
-  color: #cc6600;
-}
-
-.badge-revoked {
-  background: #ffe6e6;
-  color: #cc0000;
-}
-
-.badge-expired {
-  background: #f0f0f0;
-  color: #666;
-}
-
-.badge-pending {
-  background: #e6f2ff;
-  color: #0066cc;
-}
-
-.proof-identity {
-  font-size: 1.1em;
-  margin-bottom: 0.5rem;
-}
-
-.proof-url {
-  margin-bottom: 0.5rem;
-  font-size: 0.9em;
-}
-
-.proof-url a {
-  color: #0066cc;
-  text-decoration: none;
-}
-
-.proof-url a:hover {
-  text-decoration: underline;
-}
-
-.proof-dates {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85em;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.proof-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  color: #0066cc;
-  cursor: pointer;
-  font-size: 0.9em;
-  padding: 0;
-}
-
-.btn-link:hover {
-  text-decoration: underline;
-}
-
-.btn-link:disabled {
-  color: #999;
-  cursor: not-allowed;
-}
-
-.proof-details {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
-}
-
-.proof-details dl {
-  margin: 0;
-}
-
-.proof-details dt {
-  font-weight: 600;
-  margin-top: 0.5rem;
-}
-
-.proof-details dd {
-  margin: 0.25rem 0 0 0;
 }
 ```
 
 ---
 
-## Task 4.3: Key Card Component
+## Task 4.5: Key Card Component
 
 ### Location
 Create file: `src/components/Profile/KeyCard.tsx`
@@ -1528,103 +780,127 @@ Create file: `src/components/Profile/KeyCard.tsx`
 ### Implementation
 
 ```typescript
-import React, { useState } from 'react';
+import { useState } from "react";
+import type { AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestKey } from "../../../types/lexicons";
 
 interface KeyCardProps {
-  keyData: any;
+  keyRecord: AtProtoRecord<MeAttestKey.Main>;
 }
 
-export function KeyCard({ keyData }: KeyCardProps) {
+const KEY_ICONS: Record<string, string> = {
+  pgp: "🔐",
+  "ssh-ed25519": "🔑",
+  "ssh-ecdsa": "🔑",
+};
+
+const KEY_TYPE_LABELS: Record<string, string> = {
+  pgp: "PGP / GPG",
+  "ssh-ed25519": "SSH Ed25519",
+  "ssh-ecdsa": "SSH ECDSA",
+};
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function KeyCard({ keyRecord }: KeyCardProps) {
+  const { value } = keyRecord;
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const getKeyIcon = () => {
-    const icons: Record<string, string> = {
-      'pgp': '🔐',
-      'ssh-rsa': '🔑',
-      'ssh-ed25519': '🔑',
-      'ssh-ecdsa': '🔑',
-      'age': '📦',
-      'minisign': '✍️',
-      'signify': '✍️',
-      'wireguard': '🔒',
-    };
-    return icons[keyData.keyType] || '🔑';
-  };
+  const icon = KEY_ICONS[value.keyType] || "🔑";
+  const typeLabel = KEY_TYPE_LABELS[value.keyType] || value.keyType;
+  const isExpired = value.expiresAt && new Date(value.expiresAt) < new Date();
+  const isRevoked = value.status === "revoked";
 
-  const getKeyTypeLabel = () => {
-    const labels: Record<string, string> = {
-      'pgp': 'PGP/GPG',
-      'ssh-rsa': 'SSH RSA',
-      'ssh-ed25519': 'SSH Ed25519',
-      'ssh-ecdsa': 'SSH ECDSA',
-      'age': 'age',
-      'minisign': 'minisign',
-      'signify': 'signify',
-      'wireguard': 'WireGuard',
-    };
-    return labels[keyData.keyType] || keyData.keyType;
-  };
-
-  const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(keyData.publicKey);
+  const copyPublicKey = async () => {
+    await navigator.clipboard.writeText(value.publicKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const isExpired = keyData.expiresAt && new Date(keyData.expiresAt) < new Date();
-
   return (
-    <div className={`key-card ${isExpired ? 'key-expired' : ''}`}>
-      <div className="key-header">
-        <div className="key-type">
-          <span className="key-icon">{getKeyIcon()}</span>
-          <span className="key-type-label">{getKeyTypeLabel()}</span>
+    <div
+      className={`rounded-lg border border-surface-border p-4 ${
+        isExpired || isRevoked ? "opacity-60 border-l-4 border-l-yellow-500" : ""
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{icon}</span>
+          <span className="font-semibold">{typeLabel}</span>
+          {value.label && (
+            <span className="px-2 py-0.5 bg-accent/10 text-accent rounded text-xs">
+              {value.label}
+            </span>
+          )}
         </div>
-        {keyData.label && <span className="key-label">{keyData.label}</span>}
+        <div className="flex items-center gap-2">
+          {isRevoked && (
+            <span className="px-2 py-1 bg-red-500/10 text-red-400 rounded-full text-xs font-semibold">
+              Revoked
+            </span>
+          )}
+          {isExpired && !isRevoked && (
+            <span className="px-2 py-1 bg-yellow-500/10 text-yellow-400 rounded-full text-xs font-semibold">
+              Expired
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="key-fingerprint">
-        <strong>Fingerprint:</strong>
-        <code>{keyData.fingerprint}</code>
-      </div>
-
-      {keyData.comment && (
-        <div className="key-comment">
-          {keyData.comment}
+      {/* Fingerprint */}
+      {value.fingerprint && (
+        <div className="text-xs mb-2">
+          <span className="text-muted">Fingerprint:</span>{" "}
+          <code className="font-mono bg-page px-1.5 py-0.5 rounded border border-surface-border break-all">
+            {value.fingerprint}
+          </code>
         </div>
       )}
 
-      <div className="key-dates">
-        <span>Added: {formatDate(keyData.createdAt)}</span>
-        {keyData.expiresAt && (
-          <span className={isExpired ? 'expired' : ''}>
-            {isExpired ? 'Expired' : 'Expires'}: {formatDate(keyData.expiresAt)}
+      {/* Comment */}
+      {value.comment && (
+        <p className="text-sm text-muted mb-2">{value.comment}</p>
+      )}
+
+      {/* Dates */}
+      <div className="flex gap-4 text-xs text-muted">
+        <span>Published: {formatDate(value.createdAt)}</span>
+        {value.expiresAt && (
+          <span className={isExpired ? "text-yellow-400 font-semibold" : ""}>
+            {isExpired ? "Expired" : "Expires"}: {formatDate(value.expiresAt)}
           </span>
         )}
       </div>
 
-      <div className="key-actions">
-        <button className="btn-link" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Hide Key' : 'Show Key'}
+      {/* Actions */}
+      <div className="flex gap-3 mt-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
+        >
+          {expanded ? "Hide public key" : "Show public key"}
         </button>
-        <button className="btn-link" onClick={copyToClipboard}>
-          {copied ? 'Copied!' : 'Copy Key'}
+        <button
+          onClick={copyPublicKey}
+          className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
+        >
+          {copied ? "Copied!" : "Copy public key"}
         </button>
       </div>
 
+      {/* Expanded Key Content */}
       {expanded && (
-        <div className="key-content">
-          <pre style={{ fontSize: '0.75em', overflow: 'auto', padding: '0.5rem', background: '#f5f5f5', borderRadius: '4px' }}>
-            {keyData.publicKey}
+        <div className="mt-4 pt-4 border-t border-surface-border">
+          <pre className="text-xs font-mono whitespace-pre-wrap break-all bg-page p-3 rounded border border-surface-border overflow-x-auto max-h-64 overflow-y-auto">
+            {value.publicKey}
           </pre>
         </div>
       )}
@@ -1633,242 +909,160 @@ export function KeyCard({ keyData }: KeyCardProps) {
 }
 ```
 
-**CSS:** Add to stylesheet:
-
-```css
-.key-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.key-card.key-expired {
-  opacity: 0.6;
-  border-left: 4px solid #cc6600;
-}
-
-.key-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.key-type {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.key-icon {
-  font-size: 1.5em;
-}
-
-.key-label {
-  background: #e6f2ff;
-  color: #0066cc;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.85em;
-}
-
-.key-fingerprint {
-  margin-bottom: 0.5rem;
-  font-size: 0.9em;
-}
-
-.key-fingerprint code {
-  display: block;
-  font-family: monospace;
-  font-size: 0.85em;
-  margin-top: 0.25rem;
-  padding: 0.25rem;
-  background: #f5f5f5;
-  border-radius: 4px;
-  word-break: break-all;
-}
-
-.key-comment {
-  font-size: 0.9em;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.key-dates {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85em;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.key-dates .expired {
-  color: #cc6600;
-  font-weight: 600;
-}
-
-.key-content {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
-}
-```
-
 ---
 
-## Task 4.4: Statement Card Component
+## Task 4.6: Client-Side Proof Replay Verification Component
 
 ### Location
-Create file: `src/components/Profile/StatementCard.tsx`
+Create file: `src/components/Profile/ProofReplayVerification.tsx`
+
+### Purpose
+
+This component runs the existing client-side verifiers (`GitHubVerifier`, `TwitterVerifier` from `src/lib/verifiers/`) directly in the browser. It fetches the proof URL, checks for the challenge text, and displays a step-by-step result. No server calls are made for the verification itself (Twitter verification still uses the existing `/api/twitter/tweet` proxy for CORS).
 
 ### Implementation
 
 ```typescript
-import React, { useState } from 'react';
+import { useState } from "react";
+import type { AtProtoRecord } from "@/lib/atproto";
+import type { MeAttestProof } from "../../../types/lexicons";
+import { GitHubVerifier } from "@/lib/verifiers/github";
+import { TwitterVerifier } from "@/lib/verifiers/twitter";
+import type { BaseProofVerifier, VerificationResult } from "@/lib/verifiers/base-verifier";
 
-interface StatementCardProps {
-  statement: any;
+interface ProofReplayVerificationProps {
+  proof: AtProtoRecord<MeAttestProof.Main>;
 }
 
-export function StatementCard({ statement }: StatementCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
+interface VerificationStep {
+  step: string;
+  status: "success" | "error" | "pending";
+  message: string;
+}
 
-  const handleVerify = async () => {
+const VERIFIERS: Record<string, () => BaseProofVerifier> = {
+  github: () => new GitHubVerifier(),
+  twitter: () => new TwitterVerifier(),
+};
+
+export function ProofReplayVerification({ proof }: ProofReplayVerificationProps) {
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState<VerificationResult | null>(null);
+  const [steps, setSteps] = useState<VerificationStep[]>([]);
+
+  const { value } = proof;
+  const hasVerifier = value.service in VERIFIERS;
+
+  const handleReplay = async () => {
+    if (!hasVerifier) return;
+
     setVerifying(true);
+    setResult(null);
+    setSteps([]);
+
+    const currentSteps: VerificationStep[] = [];
+
+    const addStep = (step: string, status: VerificationStep["status"], message: string) => {
+      currentSteps.push({ step, status, message });
+      setSteps([...currentSteps]);
+    };
+
+    const updateLastStep = (status: VerificationStep["status"], message: string) => {
+      const last = currentSteps[currentSteps.length - 1];
+      currentSteps[currentSteps.length - 1] = { ...last, status, message };
+      setSteps([...currentSteps]);
+    };
 
     try {
-      const response = await fetch('/api/statements/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uri: statement.uri }),
-      });
+      // Step 1: Validate proof URL
+      addStep("Validate URL", "pending", "Checking proof URL format...");
+      const verifier = VERIFIERS[value.service]();
+      const urlValid = verifier.validateProofUrl(value.proofUrl);
 
-      const result = await response.json();
-      setVerificationResult(result);
-    } catch (err: any) {
-      setVerificationResult({ valid: false, error: err.message });
+      if (!urlValid) {
+        updateLastStep("error", "Invalid proof URL format");
+        setResult({ success: false, error: "Invalid proof URL format", errorCode: "INVALID_URL" });
+        return;
+      }
+      updateLastStep("success", "Proof URL format is valid");
+
+      // Step 2: Check handle
+      addStep("Check handle", "pending", "Validating handle...");
+      const normalizedHandle = verifier.normalizeHandle(value.handle);
+      updateLastStep("success", `Handle: ${normalizedHandle}`);
+
+      // Step 3: Fetch and verify
+      addStep("Verify proof", "pending", "Fetching proof content and verifying...");
+      const challengeText = value.challengeText || "";
+      const verificationResult = await verifier.verify(
+        value.proofUrl,
+        challengeText,
+        value.handle,
+      );
+
+      updateLastStep(
+        verificationResult.success ? "success" : "error",
+        verificationResult.success
+          ? "Challenge text found and verified"
+          : verificationResult.error || "Verification failed",
+      );
+      setResult(verificationResult);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      addStep("Error", "error", message);
+      setResult({ success: false, error: message, errorCode: "UNKNOWN_ERROR" });
     } finally {
       setVerifying(false);
     }
   };
 
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  if (!hasVerifier) {
+    return (
+      <div className="text-xs text-muted">
+        No verifier available for {value.service}
+      </div>
+    );
+  }
 
   return (
-    <div className="statement-card">
-      <div className="statement-header">
-        <span className="statement-icon">📝</span>
-        <span className="statement-title">{statement.title || 'Signed Statement'}</span>
-      </div>
-
-      <div className="statement-content">
-        <p style={{ whiteSpace: 'pre-wrap', margin: '0.5rem 0' }}>
-          {expanded ? statement.content : `${statement.content.substring(0, 200)}${statement.content.length > 200 ? '...' : ''}`}
-        </p>
-        {statement.content.length > 200 && (
-          <button className="btn-link" onClick={() => setExpanded(!expanded)}>
-            {expanded ? 'Show less' : 'Show more'}
-          </button>
-        )}
-      </div>
-
-      <div className="statement-meta">
-        <span>Signed: {formatDate(statement.createdAt)}</span>
-        {statement.keyFingerprint && (
-          <span style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>
-            Key: {statement.keyFingerprint.substring(0, 16)}...
-          </span>
-        )}
-      </div>
-
-      <div className="statement-actions">
-        <button className="btn-secondary" onClick={handleVerify} disabled={verifying}>
-          {verifying ? 'Verifying...' : 'Verify Signature'}
-        </button>
-      </div>
-
-      {verificationResult && (
-        <div className={`verification-result ${verificationResult.valid ? 'valid' : 'invalid'}`}>
-          {verificationResult.valid ? (
-            <span>✓ Signature is valid</span>
-          ) : (
-            <span>✗ Signature verification failed: {verificationResult.error}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
----
-
-## Task 4.5: Verification Report Component
-
-### Location
-Create file: `src/components/Profile/VerificationReport.tsx`
-
-### Implementation
-
-```typescript
-import React, { useState } from 'react';
-
-interface VerificationReportProps {
-  profile: any;
-}
-
-export function VerificationReport({ profile }: VerificationReportProps) {
-  const [generating, setGenerating] = useState(false);
-  const [reportUrl, setReportUrl] = useState<string | null>(null);
-
-  const generateReport = async () => {
-    setGenerating(true);
-
-    try {
-      const response = await fetch(`/api/profile/${profile.did}/report`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate report');
-      }
-
-      const data = await response.json();
-      setReportUrl(data.reportUrl);
-
-      // Open in new tab
-      window.open(data.reportUrl, '_blank');
-    } catch (err: any) {
-      alert(`Failed to generate report: ${err.message}`);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div className="verification-report">
-      <button className="btn-primary" onClick={generateReport} disabled={generating}>
-        {generating ? 'Generating...' : 'Export Verification Report'}
+    <div>
+      <button
+        onClick={handleReplay}
+        disabled={verifying}
+        className="px-3 py-1.5 text-xs font-semibold rounded bg-accent text-white border-none cursor-pointer hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {verifying ? "Verifying…" : "Replay verification"}
       </button>
 
-      {reportUrl && (
-        <div style={{ marginTop: '0.5rem', fontSize: '0.9em' }}>
-          <a href={reportUrl} target="_blank" rel="noopener noreferrer">
-            View Report
-          </a>
+      {/* Steps */}
+      {steps.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {steps.map((step, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs">
+              <span className="shrink-0 mt-0.5">
+                {step.status === "success" && "✅"}
+                {step.status === "error" && "❌"}
+                {step.status === "pending" && "⏳"}
+              </span>
+              <div>
+                <span className="font-semibold">{step.step}:</span>{" "}
+                <span className="text-muted">{step.message}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Final Result */}
+      {result && !verifying && (
+        <div
+          className={`mt-3 p-3 rounded text-xs font-semibold ${
+            result.success
+              ? "bg-green-500/10 text-green-400 border border-green-500/30"
+              : "bg-red-500/10 text-red-400 border border-red-500/30"
+          }`}
+        >
+          {result.success ? "✓ Proof is valid" : `✗ Proof is invalid: ${result.error}`}
         </div>
       )}
     </div>
@@ -1878,322 +1072,101 @@ export function VerificationReport({ profile }: VerificationReportProps) {
 
 ---
 
-## Task 4.6: Profile API Endpoint
+## Task 4.7: Route Registration
 
 ### Location
-Create file: `server/routes/profile.ts`
+Modify file: `src/routes.tsx`
 
 ### Implementation
 
 ```typescript
-import { Router, Request, Response } from 'express';
-import { AtpAgent } from '@atproto/api';
-import { listRecords } from '../lib/atproto-repo';
+import type { RouteObject } from "react-router";
+import { HomePage } from "./pages/HomePage";
+import { NotFoundPage } from "./pages/NotFoundPage";
+import { ProfilePage, profileLoader } from "./pages/ProfilePage";
+import {
+  ProfileDetailsPage,
+  profileDetailsLoader,
+} from "./pages/ProfileDetailsPage";
+import { SignVerifyPage } from "./pages/SignVerifyPage";
+import { PageLayout } from "./components/PageLayout";
+import "./index.css";
 
-const router = Router();
-
-/**
- * GET /api/profile/:identifier
- * Fetch complete profile with all proofs, keys, and statements
- */
-router.get('/:identifier', async (req: Request, res: Response) => {
-  try {
-    const { identifier } = req.params;
-
-    // Resolve identifier to DID
-    let did: string;
-    let handle: string;
-    
-    if (identifier.startsWith('did:')) {
-      did = identifier;
-      // Resolve DID to handle
-      const agent = new AtpAgent({ service: 'https://bsky.social' });
-      try {
-        const profile = await agent.getProfile({ actor: did });
-        handle = profile.data.handle;
-      } catch {
-        handle = did;
-      }
-    } else {
-      handle = identifier.replace(/^@/, '');
-      const agent = new AtpAgent({ service: 'https://bsky.social' });
-      const resolved = await agent.resolveHandle({ handle });
-      did = resolved.data.did;
-    }
-
-    // Fetch AT Proto profile
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-    let bskyProfile;
-    try {
-      const profileRes = await agent.getProfile({ actor: did });
-      bskyProfile = profileRes.data;
-    } catch {
-      bskyProfile = null;
-    }
-
-    // Fetch all records in parallel
-    const [proofsResult, keysResult, statementsResult, profileResult] = await Promise.all([
-      listRecords(agent, did, 'me.attest.proof', 100),
-      listRecords(agent, did, 'me.attest.key', 100),
-      listRecords(agent, did, 'me.attest.statement', 100),
-      listRecords(agent, did, 'me.attest.profile', 1),
-    ]);
-
-    // Format proofs
-    const proofs = proofsResult.records.map((r: any) => ({
-      uri: r.uri,
-      cid: r.cid,
-      ...r.value,
-    }));
-
-    // Format keys
-    const keys = keysResult.records.map((r: any) => ({
-      uri: r.uri,
-      cid: r.cid,
-      ...r.value,
-    }));
-
-    // Format statements
-    const statements = statementsResult.records.map((r: any) => ({
-      uri: r.uri,
-      cid: r.cid,
-      ...r.value,
-    }));
-
-    // Get profile metadata
-    const profileMeta = profileResult.records[0]?.value || {};
-
-    res.json({
-      did,
-      handle,
-      displayName: bskyProfile?.displayName || profileMeta.displayName,
-      avatar: bskyProfile?.avatar || profileMeta.avatar,
-      proofs,
-      keys,
-      statements,
-      profile: profileMeta,
-    });
-  } catch (error: any) {
-    console.error('Error fetching profile:', error);
-    res.status(500).json({
-      error: 'Failed to fetch profile',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * POST /api/profile/:did/report
- * Generate a verification report
- */
-router.post('/:did/report', async (req: Request, res: Response) => {
-  try {
-    const { did } = req.params;
-
-    // Fetch profile data
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-    const [proofsResult, keysResult] = await Promise.all([
-      listRecords(agent, did, 'me.attest.proof', 100),
-      listRecords(agent, did, 'me.attest.key', 100),
-    ]);
-
-    const report = {
-      did,
-      generatedAt: new Date().toISOString(),
-      verifiedProofs: proofsResult.records.filter((r: any) => r.value.status === 'verified').length,
-      totalProofs: proofsResult.records.length,
-      publicKeys: keysResult.records.length,
-      proofs: proofsResult.records.map((r: any) => ({
-        service: r.value.service,
-        handle: r.value.handle || r.value.identifier,
-        status: r.value.status,
-        verifiedAt: r.value.verifiedAt,
-        proofUrl: r.value.proofUrl,
-      })),
-      keys: keysResult.records.map((r: any) => ({
-        keyType: r.value.keyType,
-        fingerprint: r.value.fingerprint,
-        label: r.value.label,
-      })),
-    };
-
-    // In a real implementation, you might save this report and generate a shareable URL
-    // For now, we'll just return it as JSON
-    const reportId = Buffer.from(`${did}-${Date.now()}`).toString('base64url');
-    const reportUrl = `/reports/${reportId}`;
-
-    res.json({
-      reportUrl,
-      report,
-    });
-  } catch (error: any) {
-    console.error('Error generating report:', error);
-    res.status(500).json({
-      error: 'Failed to generate report',
-      message: error.message,
-    });
-  }
-});
-
-export default router;
-```
-
----
-
-## Task 4.7: Re-verification System
-
-### Location
-Update file: `server/routes/proofs.ts`
-
-Add this endpoint:
-
-```typescript
-/**
- * POST /api/proofs/reverify
- * Re-verify an existing proof
- */
-router.post('/reverify', async (req: Request, res: Response) => {
-  try {
-    const session = getSessionFromRequest(req);
-    if (!session) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { uri } = req.body;
-
-    if (!uri) {
-      return res.status(400).json({ error: 'Missing required field: uri' });
-    }
-
-    // Fetch the existing proof record
-    const agent = new AtpAgent({ service: session.pdsUrl });
-    agent.session = session;
-
-    const { value: proof } = await getRecord({ agent, did: session.did }, uri);
-
-    // Re-verify the proof
-    const verifier = getVerifierForService(proof.service);
-    if (!verifier) {
-      return res.status(400).json({ error: `No verifier for service: ${proof.service}` });
-    }
-
-    const result = await verifier.verify({
-      did: session.did,
-      handle: proof.handle || proof.identifier,
-      challengeText: proof.challengeText,
-      proofUrl: proof.proofUrl,
-      signature: proof.signature,
-    });
-
-    // Update the proof record
-    const updatedProof = {
-      ...proof,
-      status: result.verified ? 'verified' : 'unverified',
-      lastCheckedAt: new Date().toISOString(),
-      errorMessage: result.error || undefined,
-    };
-
-    await updateRecord(
-      { agent, did: session.did },
-      uri,
-      updatedProof
-    );
-
-    res.json({
-      success: true,
-      verified: result.verified,
-      status: updatedProof.status,
-      lastCheckedAt: updatedProof.lastCheckedAt,
-    });
-  } catch (error: any) {
-    console.error('Error re-verifying proof:', error);
-    res.status(500).json({
-      error: 'Failed to re-verify proof',
-      message: error.message,
-    });
-  }
-});
-```
-
----
-
-## Task 4.8: Background Re-verification Scheduler (Optional Advanced)
-
-### Location
-Create file: `server/lib/reverification-scheduler.ts`
-
-### Implementation
-
-```typescript
-import { AtpAgent } from '@atproto/api';
-import { listRecords, updateRecord } from './atproto-repo';
-import { getVerifierForService } from '../services';
-
-/**
- * Background job to periodically re-verify all proofs
- */
-export async function scheduleReverification() {
-  const REVERIFICATION_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-  setInterval(async () => {
-    console.log('[Reverification] Starting scheduled re-verification...');
-    await reverifyAllProofs();
-  }, REVERIFICATION_INTERVAL);
-}
-
-async function reverifyAllProofs() {
-  try {
-    // In a production system, you'd maintain a database of all users
-    // For now, this is a simplified example
-
-    const agent = new AtpAgent({ service: 'https://bsky.social' });
-
-    // Fetch all proofs that need re-verification (last checked > 7 days ago)
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 7);
-
-    // This is a placeholder - in reality, you'd query your database or PDS
-    console.log('[Reverification] Re-verification logic would go here');
-
-    // For each proof:
-    // 1. Fetch proof record
-    // 2. Run verifier
-    // 3. Update proof status
-    // 4. Log result
-  } catch (error) {
-    console.error('[Reverification] Error during scheduled re-verification:', error);
-  }
-}
-```
-
----
-
-## Routes Configuration
-
-Add to `src/routes.tsx`:
-
-```typescript
-import { ProfilePage } from './pages/ProfilePage';
-import { ProfileDetailsPage } from './pages/ProfileDetailsPage';
-
-// Add these routes:
-{
-  path: '/:identifier',
-  element: <ProfilePage />,
-},
-{
-  path: '/:identifier/details',
-  element: <ProfileDetailsPage />,
-},
+export const routes: RouteObject[] = [
+  {
+    element: <PageLayout />,
+    children: [
+      {
+        path: "/",
+        element: <HomePage />,
+      },
+      {
+        path: "/sign-verify",
+        element: <SignVerifyPage />,
+      },
+      {
+        path: "/:handle",
+        element: <ProfilePage />,
+        loader: profileLoader,
+      },
+      {
+        path: "/:handle/details",
+        element: <ProfileDetailsPage />,
+        loader: profileDetailsLoader,
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />,
+      },
+    ],
+  },
+];
 ```
 
 **Route behavior:**
-- `/:identifier` — Simple LinkTree-style profile (default, public-facing)
-- `/:identifier/details` — Technical details profile (advanced, power users)
+- `/:handle` — Simple LinkTree-style profile (default, public-facing)
+- `/:handle/details` — Technical details profile (advanced, power users)
+- Navigation between them is client-side (React Router), no full page reload
 
-**Keyboard shortcuts** (optional enhancement):
-- `Shift + D` on simple profile → navigate to details
-- `Shift + S` on details profile → navigate back to simple
+---
+
+## File Changes Summary
+
+```
+src/
+  routes.tsx                              # MODIFIED: add /:handle/details route
+  pages/
+    ProfilePage.tsx                       # MODIFIED: extend with proofs grid, summary, footer
+    ProfileDetailsPage.tsx                # NEW: technical details page with tabs
+  components/
+    Profile/
+      SimpleProofCard.tsx                 # NEW: LinkTree-style card for simple view
+      DetailedProofCard.tsx               # NEW: expandable proof card with re-verify
+      KeyCard.tsx                         # NEW: key display with fingerprint + copy
+      ProofReplayVerification.tsx         # NEW: client-side step-by-step verifier UI
+```
+
+**No server files modified or created.**
+
+---
+
+## What Is NOT Included (and Why)
+
+| Excluded | Reason |
+|----------|--------|
+| `server/routes/profile.ts` | No server endpoint needed — client fetches via existing `src/lib/atproto.ts` helpers |
+| `ServerVerificationBadge` component | No server-side verification — all verification is client-side |
+| `StatementCard` component | No statement creation flow exists yet — deferred to a future phase |
+| Statements tab on details page | Same as above |
+| `VerificationReport` component | Skipped for Phase 4 |
+| `POST /api/profile/:did/report` endpoint | Skipped for Phase 4 |
+| `POST /api/proofs/reverify` endpoint | Re-verification is client-side only via `ProofReplayVerification` |
+| `server/lib/reverification-scheduler.ts` | Production concern — not needed for Phase 4 |
+| Raw CSS class blocks | Project uses Tailwind v4 — all styling via utility classes |
+| `@atproto/api` / `AtpAgent` | Not in project dependencies — uses `@atcute/*` ecosystem and `src/lib/atproto.ts` |
+| Express patterns (`Router`, `Request`, `Response`) | Project uses Fastify — no server code in this phase anyway |
+| `server/lib/atproto-repo.ts` imports | File was deleted in Phase 2 — replaced by `src/lib/atproto.ts` |
+| `useParams` + `useEffect` data fetching | Project uses React Router v7 loaders with `useLoaderData` |
 
 ---
 
@@ -2202,49 +1175,41 @@ import { ProfileDetailsPage } from './pages/ProfileDetailsPage';
 Phase 4 is complete when:
 
 **Profile Routes & Views:**
-- [ ] **Simple profile route (`/:identifier`) works with LinkTree-style layout**
-- [ ] **Technical details route (`/:identifier/details`) works with full DID and proof details**
-- [ ] **Simple profile shows verified accounts grid with visual checkmarks**
-- [ ] **Technical details profile shows DID prominently with copy button**
-- [ ] **Navigation between simple and details views works (footer links)**
-- [ ] **Simple profile hides all technical jargon (no DIDs, signatures, etc.)**
-- [ ] **Details profile shows challenge text, signatures, and replay verification**
+- [ ] Simple profile route (`/:handle`) shows LinkTree-style layout with avatar, name, bio
+- [ ] Technical details route (`/:handle/details`) shows DID, proofs tab, keys tab
+- [ ] Simple profile shows verified accounts grid with visual checkmarks
+- [ ] Technical details profile shows DID prominently with copy button
+- [ ] Navigation between simple and details views works (React Router, no full reload)
+- [ ] Simple profile hides all technical jargon (no DIDs, nonces, CIDs, etc.)
+- [ ] Details profile shows challenge text, nonce, record URI, CID in expandable sections
 
 **Proof Display:**
-- [ ] SimpleProofCard component displays service icon, handle, and verification status
-- [ ] SimpleProofCard links to actual external service (GitHub profile, Etherscan, etc.)
-- [ ] DetailedProofCard shows full proof information with expandable details
-- [ ] Proof status badges display correctly (✓ verified, ⚠ unverified, ✗ revoked, ⌛ expired)
-- [ ] **Proof cards integrate client-side replay verification component**
-- [ ] **Proof cards show server verification badge with cache status**
-- [ ] **Expanded proof details show serverVerification metadata**
+- [ ] `SimpleProofCard` displays service icon, handle, and active/retracted status
+- [ ] `SimpleProofCard` links to actual external service profile (GitHub, Twitter)
+- [ ] `DetailedProofCard` shows full proof information with expandable details
+- [ ] Proof status badges display correctly (✓ active, ✗ retracted)
+- [ ] `ProofReplayVerification` runs client-side verifiers in browser
+- [ ] `ProofReplayVerification` shows step-by-step verification result (URL validation, handle check, content verification)
+- [ ] Verification result clearly shows ✓ valid or ✗ invalid with error message
 
-**Functionality:**
-- [ ] Profile API endpoint returns complete user data (proofs, keys, statements)
-- [ ] Re-verify all proofs button works on details page
-- [ ] Individual proof re-verification works
-- [ ] Copy DID button works on details page
-- [ ] SSH/PGP key export links work
-- [ ] Share profile button works on simple view
-- [ ] **Both verification modes (client replay + server cached) are functional in UI**
-- [ ] All verification components from Phase 2 are properly imported and used
+**Key Display:**
+- [ ] `KeyCard` displays key type icon, label, fingerprint, and expiration status
+- [ ] `KeyCard` expand/collapse shows full public key text
+- [ ] Copy public key button works
+- [ ] Expired and revoked keys are visually dimmed
 
-**UI & UX:**
-- [ ] Key cards display fingerprint, type, and expiration status
-- [ ] Statement cards support signature verification
-- [ ] Verification report can be exported and shared
-- [ ] All components are styled consistently
-- [ ] Profile pages are responsive on mobile devices
-- [ ] Empty states are handled gracefully (no proofs, no keys, etc.)
-- [ ] Error messages are user-friendly
-- [ ] Loading states display correctly
+**Empty States:**
+- [ ] Simple profile with no proofs shows "No verified accounts yet" message
+- [ ] Details proofs tab with no proofs shows "No proofs found" message
+- [ ] Details keys tab with no keys shows "No keys published" message
 
-**Testing:**
-- [ ] All unit tests pass with >80% coverage
-- [ ] Simple profile loads correctly for users with/without proofs
-- [ ] Details profile loads correctly and displays all technical information
-- [ ] Navigation between views preserves state
-- [ ] External links open in new tabs
+**Technical Requirements:**
+- [ ] All styling uses Tailwind v4 utility classes with project theme tokens
+- [ ] Both pages use React Router v7 loaders (`LoaderFunctionArgs` → `useLoaderData`)
+- [ ] Data fetched via `listProofs()` / `listKeys()` from `src/lib/atproto.ts`
+- [ ] TypeScript strict mode — 0 type errors
+- [ ] ESLint clean — 0 lint errors
+- [ ] All existing tests still pass (72 tests)
 
 ---
 

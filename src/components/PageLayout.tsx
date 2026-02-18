@@ -209,7 +209,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   };
 
   return (
-    <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-6 py-8 flex flex-col">
+    <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-2 py-8 flex flex-col">
       {/* Header */}
       <header ref={headerRef} className="flex items-center mb-3 relative h-8">
         {/* Logo: always rendered, animated in/out based on route */}
@@ -424,7 +424,7 @@ export function PageLayout({ children }: PageLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 border border-surface-border p-6">
+      <div className="flex-1 flex flex-col border border-surface-border p-6">
         {children ?? <Outlet />}
       </div>
 

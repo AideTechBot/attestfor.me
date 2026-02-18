@@ -2,6 +2,10 @@ import type { RouteObject } from "react-router";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProfilePage, profileLoader } from "./pages/ProfilePage";
+import {
+  ProfileDetailsPage,
+  profileDetailsLoader,
+} from "./pages/ProfileDetailsPage";
 import { SignVerifyPage } from "./pages/SignVerifyPage";
 import { PageLayout } from "./components/PageLayout";
 import "./index.css";
@@ -17,6 +21,11 @@ export const routes: RouteObject[] = [
       {
         path: "/sign-verify",
         element: <SignVerifyPage />,
+      },
+      {
+        path: "/:handle/details",
+        element: <ProfileDetailsPage />,
+        loader: profileDetailsLoader,
       },
       {
         path: "/:handle",
