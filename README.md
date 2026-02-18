@@ -16,6 +16,12 @@ This pulls the latest Docker image, sets up Caddy for automatic HTTPS, and start
 cd ~/attestfor.me && docker compose pull && docker compose up -d
 ```
 
+To blow everything away from the server do:
+
+```bash
+cd ~/attestfor.me && docker compose down && cd ~ && rm -rf ~/attestfor.me
+```
+
 ## Development
 
 ### Dependencies

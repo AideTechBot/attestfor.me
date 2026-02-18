@@ -1,5 +1,6 @@
 {
 	acme_ca https://acme.zerossl.com/v2/DV90
+	email {$ACME_EMAIL:admin@attestfor.me}
 }
 
 {$DOMAIN:attestfor.me} {
