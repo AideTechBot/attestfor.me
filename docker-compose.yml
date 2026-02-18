@@ -37,8 +37,8 @@ services:
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
     restart: unless-stopped
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:3001:3000"
     environment:
       - DATABASE_URL=postgresql://umami:${UMAMI_DB_PASSWORD:?Set UMAMI_DB_PASSWORD in .env}@umami-db:5432/umami
       - APP_SECRET=${UMAMI_APP_SECRET:?Set UMAMI_APP_SECRET in .env}

@@ -80,7 +80,7 @@ docker compose up -d
 UMAMI_WEBSITE_ID=$(load_or_generate UMAMI_WEBSITE_ID)
 UMAMI_ADMIN_PASSWORD=$(load_or_generate UMAMI_ADMIN_PASSWORD)
 
-# Helper: hit the Umami API via Caddy (which reverse-proxies analytics.$DOMAIN → umami:3000)
+# Helper: hit the Umami API directly on localhost:3001 (published port, no TLS needed)
 # Usage: umami_fetch METHOD PATH [BODY] [TOKEN]
 umami_fetch() {
   local method="$1" path="$2" body="${3:-}" token="${4:-}"
@@ -91,13 +91,13 @@ umami_fetch() {
   if [ -n "$token" ]; then
     args+=( -H "Authorization: Bearer $token" )
   fi
-  curl "${args[@]}" "https://analytics.${DOMAIN}${path}"
+  curl "${args[@]}" "http://127.0.0.1:3001${path}"
 }
 
 # Only run provisioning if UMAMI_WEBSITE_ID looks unset (a 64-char hex = freshly generated, not a UUID)
 if [[ ${#UMAMI_WEBSITE_ID} -ne 36 ]]; then
-  UMAMI_HEARTBEAT_URL="https://analytics.${DOMAIN}/api/heartbeat"
-  echo "==> Waiting for Umami to be ready (${UMAMI_HEARTBEAT_URL})..."
+  UMAMI_HEARTBEAT_URL="http://127.0.0.1:3001/api/heartbeat"
+  echo "==> Waiting for Umami to be ready (direct on localhost:3001)..."
   UMAMI_READY=false
   for i in $(seq 1 60); do
     HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$UMAMI_HEARTBEAT_URL" 2>&1) || true
