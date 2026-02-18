@@ -11,6 +11,17 @@ export default defineConfig({
         plugins: [["babel-plugin-react-compiler"]],
       },
     }),
+    // Inject Umami analytics script tag so it survives Vite's build
+    // The placeholder is replaced at runtime by the server with the real website ID
+    {
+      name: "inject-umami",
+      transformIndexHtml(html) {
+        return html.replace(
+          "</head>",
+          `  <script defer src="/u/script.js" data-website-id="__UMAMI_WEBSITE_ID__"></script>\n  </head>`,
+        );
+      },
+    },
   ],
   resolve: {
     alias: {
