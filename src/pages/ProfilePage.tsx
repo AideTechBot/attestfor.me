@@ -21,91 +21,6 @@ interface ProfileData {
   keys: AtProtoRecord<MeAttestKey.Main>[];
 }
 
-// ── Stub data for UI preview (remove when real data is available) ──
-const USE_STUB_DATA = true;
-
-const STUB_PROOFS: AtProtoRecord<MeAttestProof.Main>[] = [
-  {
-    uri: "at://did:plc:stub1234/me.attest.proof/github1",
-    cid: "bafyreig1234567890abcdefghijklmnopqrstuvwxyz",
-    value: {
-      $type: "me.attest.proof",
-      service: "github",
-      handle: "manoo-bafyrei",
-      proofUrl: "https://gist.github.com/manoo-bafyrei/abc123",
-      nonce: "a7f3b2c9e1d4f6a8b0c2d4e6f8a0b2c4",
-      challengeText:
-        "I am manoo.dev on Bluesky. Nonce: a7f3b2c9e1d4f6a8b0c2d4e6f8a0b2c4",
-      status: "active",
-      createdAt: "2025-12-01T10:00:00.000Z",
-    },
-  },
-  {
-    uri: "at://did:plc:stub1234/me.attest.proof/twitter1",
-    cid: "bafyreig0987654321zyxwvutsrqponmlkjihgfedcba",
-    value: {
-      $type: "me.attest.proof",
-      service: "twitter",
-      handle: "@manoo_dev",
-      proofUrl: "https://x.com/manoo_dev/status/1234567890",
-      nonce: "d4e6f8a0b2c4a7f3b2c9e1d4f6a8b0c2",
-      challengeText:
-        "I am manoo.dev on Bluesky. Nonce: d4e6f8a0b2c4a7f3b2c9e1d4f6a8b0c2",
-      status: "active",
-      createdAt: "2025-12-15T14:30:00.000Z",
-    },
-  },
-  {
-    uri: "at://did:plc:stub1234/me.attest.proof/github2",
-    cid: "bafyreihabcdefghijklmnopqrstuvwxyz123456789",
-    value: {
-      $type: "me.attest.proof",
-      service: "github",
-      handle: "old-github-handle",
-      proofUrl: "https://gist.github.com/old-github-handle/xyz789",
-      nonce: "f8a0b2c4a7f3b2c9e1d4f6a8b0c2d4e6",
-      challengeText:
-        "I am manoo.dev on Bluesky. Nonce: f8a0b2c4a7f3b2c9e1d4f6a8b0c2d4e6",
-      status: "retracted",
-      createdAt: "2025-11-01T08:00:00.000Z",
-      retractedAt: "2025-11-20T16:00:00.000Z",
-    },
-  },
-];
-
-const STUB_KEYS: AtProtoRecord<MeAttestKey.Main>[] = [
-  {
-    uri: "at://did:plc:stub1234/me.attest.key/pgp1",
-    cid: "bafyreipgpkey1234567890abcdefghijklmnopqrst",
-    value: {
-      $type: "me.attest.key",
-      keyType: "pgp",
-      publicKey:
-        "-----BEGIN PGP PUBLIC KEY BLOCK-----\nmQINBGV...example...\n-----END PGP PUBLIC KEY BLOCK-----",
-      fingerprint: "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
-      label: "Personal signing key",
-      comment: "Used for signing commits and emails",
-      status: "active",
-      createdAt: "2025-10-15T12:00:00.000Z",
-      expiresAt: "2027-10-15T12:00:00.000Z",
-    },
-  },
-  {
-    uri: "at://did:plc:stub1234/me.attest.key/ssh1",
-    cid: "bafyreisshkey1234567890abcdefghijklmnopqrst",
-    value: {
-      $type: "me.attest.key",
-      keyType: "ssh-ed25519",
-      publicKey:
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHere manoo@workstation",
-      fingerprint: "SHA256:xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx",
-      label: "Work laptop",
-      status: "active",
-      createdAt: "2025-11-01T09:00:00.000Z",
-    },
-  },
-];
-
 // eslint-disable-next-line react-refresh/only-export-components
 export async function profileLoader({
   params,
@@ -149,12 +64,10 @@ export async function profileLoader({
     }
 
     // Fetch proofs and keys in parallel using the DID
-    const [proofs, keys] = USE_STUB_DATA
-      ? [STUB_PROOFS, STUB_KEYS]
-      : await Promise.all([
-          listProofs(profile.did).catch(() => []),
-          listKeys(profile.did).catch(() => []),
-        ]);
+    const [proofs, keys] = await Promise.all([
+      listProofs(profile.did).catch(() => []),
+      listKeys(profile.did).catch(() => []),
+    ]);
 
     return {
       handle: profile.handle,
