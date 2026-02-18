@@ -8,6 +8,7 @@ set -euo pipefail
 # Example:
 #   curl -fsSL https://raw.githubusercontent.com/AideTechBot/attestfor.me/main/scripts/deploy.sh | bash -s -- attestfor.me
 
+SCRIPT_VERSION="2026-02-18a"
 REPO_RAW="https://raw.githubusercontent.com/AideTechBot/attestfor.me/main"
 INSTALL_DIR="$HOME/attestfor.me"
 
@@ -19,7 +20,8 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
-echo "==> Deploying attestfor.me for domain: $DOMAIN"
+echo "==> attestfor.me deploy script v${SCRIPT_VERSION}"
+echo "==> Deploying for domain: $DOMAIN"
 
 # ── Check prerequisites ────────────────────────────────────────────
 for cmd in docker curl openssl; do
@@ -94,13 +96,17 @@ umami_fetch() {
 
 # Only run provisioning if UMAMI_WEBSITE_ID looks unset (a 64-char hex = freshly generated, not a UUID)
 if [[ ${#UMAMI_WEBSITE_ID} -ne 36 ]]; then
-  echo "==> Waiting for Umami to be ready..."
+  UMAMI_HEARTBEAT_URL="https://analytics.${DOMAIN}/api/heartbeat"
+  echo "==> Waiting for Umami to be ready (${UMAMI_HEARTBEAT_URL})..."
   UMAMI_READY=false
   for i in $(seq 1 60); do
-    if umami_fetch GET /api/heartbeat >/dev/null 2>&1; then
+    HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$UMAMI_HEARTBEAT_URL" 2>&1) || true
+    if [ "$HTTP_CODE" = "200" ]; then
+      echo "    ✓ Umami ready (attempt $i)"
       UMAMI_READY=true
       break
     fi
+    echo "    attempt $i/60 — HTTP $HTTP_CODE (retrying in 2s)"
     sleep 2
   done
 
