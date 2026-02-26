@@ -311,6 +311,11 @@ export function PageLayout({ children }: PageLayoutProps) {
             }}
           >
             <DropdownMenuTrigger
+              aria-label={
+                session.authenticated
+                  ? `${session.displayName || session.handle || "Account"} menu`
+                  : "Account menu"
+              }
               className={cn(
                 "relative w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
                 "flex items-center justify-center text-muted text-xs shrink-0 leading-none overflow-hidden",

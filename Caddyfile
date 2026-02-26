@@ -27,3 +27,7 @@ analytics.{$DOMAIN:attestfor.me} {
 testfor.me, at.testfor.me {
 	redir https://{$DOMAIN:attestfor.me}{uri} permanent
 }
+
+manoo.dev {
+	redir https://{$DOMAIN:attestfor.me}/manoo.dev 301
+}
