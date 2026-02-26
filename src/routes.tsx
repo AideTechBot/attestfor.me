@@ -6,7 +6,6 @@ import {
   ProfileDetailsPage,
   profileDetailsLoader,
 } from "./pages/ProfileDetailsPage";
-import { SignVerifyPage } from "./pages/SignVerifyPage";
 import { EditProfilePage } from "./pages/EditProfilePage";
 import { FaqPage } from "./pages/FaqPage";
 import { PageLayout } from "./components/PageLayout";
@@ -24,10 +23,6 @@ export const routes: RouteObject[] = [
       {
         path: "/faq",
         element: <FaqPage />,
-      },
-      {
-        path: "/sign-verify",
-        element: <SignVerifyPage />,
       },
       {
         path: "/edit/proofs",
