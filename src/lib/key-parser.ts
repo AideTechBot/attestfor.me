@@ -1,5 +1,3 @@
-import * as openpgp from "openpgp";
-
 export interface ParsedKey {
   keyType: string;
   fingerprint: string;
@@ -21,10 +19,22 @@ async function sha256Fingerprint(data: Uint8Array): Promise<string> {
   return `SHA256:${base64}`;
 }
 
+// Dynamically import opengpg
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let openpgpPromise: Promise<typeof import("openpgp")> | null = null;
+
+function getOpenpgp() {
+  if (!openpgpPromise) {
+    openpgpPromise = import("openpgp");
+  }
+  return openpgpPromise;
+}
+
 /**
  * Parse and extract fingerprint from a PGP public key.
  */
 export async function parsePGPKey(armoredKey: string): Promise<ParsedKey> {
+  const openpgp = await getOpenpgp();
   const key = await openpgp.readKey({ armoredKey });
 
   const fingerprint = key.getFingerprint().toUpperCase();

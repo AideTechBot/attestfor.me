@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +43,11 @@ function useSession() {
 export function EditProfilePage() {
   const { data: session, isLoading: sessionLoading } = useSession();
   const [activeTab, setActiveTab] = useState<"proofs" | "keys">("proofs");
+
+  // Preload openpgp when this page is first visited so it's ready before the user needs it
+  useEffect(() => {
+    import("openpgp");
+  }, []);
 
   // ── Fetch live proofs ──────────────────────────────────────────────
   const {

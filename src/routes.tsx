@@ -6,10 +6,10 @@ import {
   ProfileDetailsPage,
   profileDetailsLoader,
 } from "./pages/ProfileDetailsPage";
-import { EditProfilePage } from "./pages/EditProfilePage";
 import { FaqPage } from "./pages/FaqPage";
 import { PageLayout } from "./components/PageLayout";
 import { SimplePageLayout } from "./components/SimplePageLayout";
+import { EditProfilePage } from "./pages/EditProfilePage";
 import "./index.css";
 
 export const routes: RouteObject[] = [
