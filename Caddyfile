@@ -4,10 +4,19 @@
 }
 
 {$DOMAIN:attestfor.me} {
+	encode zstd gzip
+
 	handle /u/* {
 		uri strip_prefix /u
 		reverse_proxy umami:3000
 	}
+
+	# Hashed asset files are content-addressed — safe to cache for 1 year
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy app:3000
+	}
+
 	reverse_proxy app:3000
 }
 

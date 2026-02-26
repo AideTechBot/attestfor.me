@@ -16,11 +16,11 @@ export function SimplePageLayout() {
   return (
     <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-2 py-8 flex flex-col">
       {/* Main Content — no header, no border */}
-      <div className="flex-1 flex flex-col p-6">
+      <main className="flex-1 flex flex-col p-6">
         <VerificationProvider>
           <Outlet />
         </VerificationProvider>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="mt-3 flex justify-center gap-4 text-xs text-muted">

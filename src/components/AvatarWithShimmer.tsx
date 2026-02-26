@@ -20,6 +20,7 @@ export function AvatarWithShimmer({ src, alt }: { src: string; alt: string }) {
         ref={imgRef}
         src={src}
         alt={alt}
+        fetchPriority="high"
         className={`w-30 h-30 object-cover shadow-lg shadow-accent-subtle transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
         onLoad={() => setLoaded(true)}
       />

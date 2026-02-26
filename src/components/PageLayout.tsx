@@ -413,9 +413,9 @@ export function PageLayout({ children }: PageLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col border border-surface-border p-6">
+      <main className="flex-1 flex flex-col border border-surface-border p-6">
         <VerificationProvider>{children ?? <Outlet />}</VerificationProvider>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="mt-3 flex justify-center gap-4 text-xs text-muted">

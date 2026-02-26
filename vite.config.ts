@@ -38,6 +38,33 @@ export default defineConfig({
     // Improve SSR build performance
     minify: true,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // openpgp is ~384 KB — split into its own chunk so it only loads
+          // on pages that actually use it (KeyUpload)
+          if (id.includes("node_modules/openpgp")) {
+            return "openpgp";
+          }
+          // Stable React core chunk — long-lived cache
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "react";
+          }
+          // React Router
+          if (id.includes("node_modules/react-router")) {
+            return "router";
+          }
+          // TanStack Query
+          if (id.includes("node_modules/@tanstack")) {
+            return "query";
+          }
+        },
+      },
+    },
   },
   ssr: {
     target: "node",

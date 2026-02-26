@@ -52,6 +52,8 @@ const { render } = (await import(
     html: string;
     notFound: boolean;
     hasSession: boolean;
+    metaDescription?: string;
+    metaTitle?: string;
     redirect?: Response;
   }>;
 };
@@ -75,13 +77,24 @@ app.get("/*", async (req, res) => {
       }
     }
 
-    const { html, notFound, hasSession } = result;
+    const { html, notFound, hasSession, metaDescription, metaTitle } = result;
 
     // Inject runtime data so client hydration has session hint immediately
     const injectScript = `<script>window.__HAS_SESSION__=${hasSession ? "true" : "false"};</script>`;
+    const headInjection = [
+      injectScript,
+      metaTitle ? `<meta property="og:title" content="${metaTitle}" />` : "",
+      metaDescription
+        ? `<meta name="description" content="${metaDescription}" /><meta property="og:description" content="${metaDescription}" />`
+        : "",
+    ].join("");
     const fullHtml = templateHtml
       .replace("<!--app-html-->", html)
-      .replace("</head>", injectScript + "</head>");
+      .replace(
+        "<title>ATtest for me!</title>",
+        `<title>${metaTitle ?? "ATtest for me!"}</title>`,
+      )
+      .replace("</head>", headInjection + "</head>");
 
     if (notFound) {
       res.status(404);

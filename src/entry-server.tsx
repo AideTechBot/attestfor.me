@@ -51,5 +51,37 @@ export async function render(request: Request) {
       return data?.isValid === false;
     });
 
-  return { html, notFound: isNotFound, hasSession };
+  // Build per-page meta tags from loader data
+  let metaDescription: string | undefined;
+  let metaTitle: string | undefined;
+
+  for (const match of context.matches) {
+    const data = context.loaderData?.[match.route.id] as
+      | {
+          handle?: string;
+          displayName?: string;
+          description?: string;
+          proofs?: unknown[];
+          keys?: unknown[];
+          isValid?: boolean;
+        }
+      | undefined;
+
+    if (data?.isValid && data.handle) {
+      const name = data.displayName || `@${data.handle}`;
+      const proofCount = data.proofs?.length ?? 0;
+      const keyCount = data.keys?.length ?? 0;
+
+      metaTitle = `${name} (@${data.handle}) — ATtestfor.me`;
+
+      if (data.description) {
+        metaDescription = `${data.description} · ${proofCount} verified account${proofCount !== 1 ? "s" : ""} on ATtestfor.me.`;
+      } else {
+        metaDescription = `${name} has ${proofCount} linked account${proofCount !== 1 ? "s" : ""} and ${keyCount} public key${keyCount !== 1 ? "s" : ""} on ATtestfor.me.`;
+      }
+      break;
+    }
+  }
+
+  return { html, notFound: isNotFound, hasSession, metaDescription, metaTitle };
 }
