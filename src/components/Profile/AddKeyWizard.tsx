@@ -167,6 +167,7 @@ export function AddKeyWizard({ onAdd, onCancel }: AddKeyWizardProps) {
             {/* Optional label */}
             <input
               type="text"
+              aria-label="Key label (optional)"
               placeholder="Label (optional — e.g. work laptop, signing key)"
               value={label}
               onChange={(e) => setLabel(e.target.value)}

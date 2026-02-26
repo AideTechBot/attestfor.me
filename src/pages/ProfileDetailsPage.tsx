@@ -146,8 +146,15 @@ export function ProfileDetailsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex mb-6 border-b-2 border-surface-border">
+      <div
+        role="tablist"
+        aria-label="Profile sections"
+        className="flex mb-6 border-b-2 border-surface-border"
+      >
         <button
+          role="tab"
+          aria-selected={activeTab === "proofs"}
+          aria-controls="tab-panel-proofs"
           onClick={() => setActiveTab("proofs")}
           className={`flex-1 py-3 text-sm font-semibold border-b-3 -mb-0.5 transition-colors cursor-pointer bg-transparent ${
             activeTab === "proofs"
@@ -158,6 +165,9 @@ export function ProfileDetailsPage() {
           Proofs ({activeProofs.length})
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === "keys"}
+          aria-controls="tab-panel-keys"
           onClick={() => setActiveTab("keys")}
           className={`flex-1 py-3 text-sm font-semibold border-b-3 -mb-0.5 transition-colors cursor-pointer bg-transparent ${
             activeTab === "keys"
@@ -171,7 +181,11 @@ export function ProfileDetailsPage() {
 
       {/* Tab Content */}
       {activeTab === "proofs" && (
-        <div className="flex flex-col gap-4">
+        <div
+          id="tab-panel-proofs"
+          role="tabpanel"
+          className="flex flex-col gap-4"
+        >
           {activeProofs.length > 0 ? (
             activeProofs.map((proof) => (
               <DetailedProofCard key={proof.uri} proof={proof} />
@@ -188,7 +202,11 @@ export function ProfileDetailsPage() {
       )}
 
       {activeTab === "keys" && (
-        <div className="flex flex-col gap-4">
+        <div
+          id="tab-panel-keys"
+          role="tabpanel"
+          className="flex flex-col gap-4"
+        >
           {profile.keys.length > 0 ? (
             profile.keys.map((key) => <KeyCard key={key.uri} keyRecord={key} />)
           ) : (

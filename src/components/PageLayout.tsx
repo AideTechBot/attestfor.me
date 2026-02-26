@@ -251,6 +251,7 @@ export function PageLayout({ children }: PageLayoutProps) {
             <Input
               ref={inputRef}
               type="text"
+              aria-label="Search for a user"
               placeholder="Search..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
@@ -350,6 +351,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                     <div className="flex flex-col gap-2">
                       <input
                         type="text"
+                        aria-label="Your AT Protocol handle"
                         placeholder="your.handle.example"
                         value={loginHandle}
                         onChange={(e) => setLoginHandle(e.target.value)}

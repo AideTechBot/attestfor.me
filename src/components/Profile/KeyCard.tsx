@@ -106,6 +106,7 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
         <div className="flex gap-3 pt-3">
           <button
             onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
             className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
           >
             {expanded ? "Hide public key" : "Show public key"}

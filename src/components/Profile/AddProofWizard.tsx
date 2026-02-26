@@ -176,6 +176,7 @@ export function AddProofWizard({ did, onAdd, onCancel }: AddProofWizardProps) {
             </p>
             <input
               type="text"
+              aria-label={`Your ${SERVICE_NAMES[service] ?? service} handle`}
               placeholder={service === "twitter" ? "@username" : "username"}
               value={serviceHandle}
               onChange={(e) => setServiceHandle(e.target.value)}

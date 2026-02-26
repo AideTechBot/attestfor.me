@@ -73,6 +73,7 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
       {/* Header row — click to collapse/expand body */}
       <button
         onClick={() => setCollapsed((c) => !c)}
+        aria-expanded={!collapsed}
         className={`w-full flex items-center justify-between px-4 py-2.5 border-b border-surface-border cursor-pointer bg-transparent transition-colors hover:bg-white/5 border-l-4 ${borderColour} ${collapsed ? "border-b-0" : ""}`}
       >
         <div className="flex items-center gap-2.5">

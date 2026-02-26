@@ -343,6 +343,7 @@ export function EditProfilePage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="proof-wizard-title"
         >
           <div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -365,6 +366,7 @@ export function EditProfilePage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="key-wizard-title"
         >
           <div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
