@@ -10,6 +10,7 @@ import {
   listKeys,
   publishKey,
   deleteKey,
+  revokeKey,
   parseAtUri,
 } from "@/lib/atproto";
 import type { AtProtoRecord } from "@/lib/atproto";
@@ -80,6 +81,7 @@ export function EditProfilePage() {
 
   // ── Key edit state ────────────────────────────────────────────────
   const [keysToDelete, setKeysToDelete] = useState<Set<string>>(new Set());
+  const [keysToRevoke, setKeysToRevoke] = useState<Set<string>>(new Set());
   const [keysToAdd, setKeysToAdd] = useState<PendingKey[]>([]);
   const [showKeyWizard, setShowKeyWizard] = useState(false);
 
@@ -89,6 +91,7 @@ export function EditProfilePage() {
     proofsToDelete.size > 0 ||
     proofsToAdd.length > 0 ||
     keysToDelete.size > 0 ||
+    keysToRevoke.size > 0 ||
     keysToAdd.length > 0;
 
   // ── Proof handlers ────────────────────────────────────────────────
@@ -118,6 +121,18 @@ export function EditProfilePage() {
 
   const handleToggleDeleteKey = (uri: string) => {
     setKeysToDelete((prev) => {
+      const next = new Set(prev);
+      if (next.has(uri)) {
+        next.delete(uri);
+      } else {
+        next.add(uri);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleRevokeKey = (uri: string) => {
+    setKeysToRevoke((prev) => {
       const next = new Set(prev);
       if (next.has(uri)) {
         next.delete(uri);
@@ -166,6 +181,17 @@ export function EditProfilePage() {
           );
         });
       }),
+      ...[...keysToRevoke].map((uri) => {
+        const record = existingKeys.find((k) => k.uri === uri);
+        if (!record) {
+          return Promise.resolve();
+        }
+        return revokeKey(record).catch((e: unknown) => {
+          throw new Error(
+            `Failed to revoke key: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
+      }),
       ...keysToAdd.map((k) =>
         publishKey(k.record).catch((e: unknown) => {
           throw new Error(
@@ -181,6 +207,7 @@ export function EditProfilePage() {
       setProofsToDelete(new Set());
       setProofsToAdd([]);
       setKeysToDelete(new Set());
+      setKeysToRevoke(new Set());
       setKeysToAdd([]);
       await Promise.all([refetchProofs(), refetchKeys()]);
     } catch (e) {
@@ -195,6 +222,7 @@ export function EditProfilePage() {
     setProofsToAdd([]);
     setShowProofWizard(false);
     setKeysToDelete(new Set());
+    setKeysToRevoke(new Set());
     setKeysToAdd([]);
     setShowKeyWizard(false);
   };
@@ -244,7 +272,7 @@ export function EditProfilePage() {
           const pendingCount =
             tab === "proofs"
               ? proofsToAdd.length + proofsToDelete.size
-              : keysToAdd.length + keysToDelete.size;
+              : keysToAdd.length + keysToDelete.size + keysToRevoke.size;
           return (
             <button
               key={tab}
@@ -325,8 +353,10 @@ export function EditProfilePage() {
             <EditKeyList
               existing={existingKeys}
               toDelete={keysToDelete}
+              toRevoke={keysToRevoke}
               toAdd={keysToAdd}
               onToggleDelete={handleToggleDeleteKey}
+              onToggleRevoke={handleToggleRevokeKey}
               onRemoveAdd={handleRemoveAddKey}
             />
           )}
@@ -407,7 +437,7 @@ export function EditProfilePage() {
                 Saving…
               </>
             ) : (
-              `Save changes (${proofsToAdd.length + proofsToDelete.size + keysToAdd.length + keysToDelete.size})`
+              `Save changes (${proofsToAdd.length + proofsToDelete.size + keysToAdd.length + keysToDelete.size + keysToRevoke.size})`
             )}
           </button>
         </div>
@@ -431,6 +461,12 @@ export function EditProfilePage() {
           {keysToAdd.length > 0 && (
             <div className="text-green-400">
               + {keysToAdd.length} key{keysToAdd.length !== 1 ? "s" : ""} to add
+            </div>
+          )}
+          {keysToRevoke.size > 0 && (
+            <div className="text-orange-400">
+              ⊘ {keysToRevoke.size} key{keysToRevoke.size !== 1 ? "s" : ""} to
+              revoke
             </div>
           )}
           {keysToDelete.size > 0 && (

@@ -143,6 +143,30 @@ export async function createRecord(
 }
 
 /**
+ * Update (put) a record in the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
+ */
+export async function putRecord(
+  collection: string,
+  rkey: string,
+  record: Record<string, unknown>,
+): Promise<{ uri: string; cid: string }> {
+  const response = await fetch("/api/repo/putRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, rkey, record }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Delete a record from the authenticated user's repo.
  * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
  */
@@ -222,6 +246,25 @@ export async function publishKey(
  */
 export async function deleteKey(rkey: string): Promise<void> {
   return deleteRecord(KEY_COLLECTION, rkey);
+}
+
+/**
+ * Revoke a key by updating its status to "revoked" (via server proxy).
+ * Preserves all other fields and sets status = "revoked".
+ */
+export async function revokeKey(
+  record: AtProtoRecord<MeAttestKey.Main>,
+): Promise<{ uri: string; cid: string }> {
+  const { rkey } = parseAtUri(record.uri);
+  const updated: MeAttestKey.Main = {
+    ...record.value,
+    status: "revoked",
+  };
+  return putRecord(
+    KEY_COLLECTION,
+    rkey,
+    updated as unknown as Record<string, unknown>,
+  );
 }
 
 /**
