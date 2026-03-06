@@ -1,16 +1,16 @@
 import { useState, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof } from "../../../types/lexicons";
-import { ProofReplayVerification } from "./ProofReplayVerification";
-import { getProofBorderColour } from "@/lib/proof-border-colour";
+import type { DevKeytraceClaim } from "../../../types/keytrace";
+import { ClaimReplayVerification } from "./ClaimReplayVerification";
+import { getClaimBorderColour } from "@/lib/claim-border-colour";
 import { SERVICE_NAMES } from "@/lib/global-features";
 import { ServiceIcon } from "./ServiceIcon";
 import { useVerification } from "@/lib/verification-context";
 import { runVerification } from "@/lib/run-verification";
 
-interface DetailedProofCardProps {
-  proof: AtProtoRecord<MeAttestProof.Main>;
+interface DetailedClaimCardProps {
+  claim: AtProtoRecord<DevKeytraceClaim.Main>;
 }
 
 function formatDate(iso: string): string {
@@ -21,17 +21,17 @@ function formatDate(iso: string): string {
   });
 }
 
-export function DetailedProofCard({ proof }: DetailedProofCardProps) {
-  const { value } = proof;
+export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
+  const { value } = claim;
   const [collapsed, setCollapsed] = useState(true);
   const lastVerifyRef = useRef<number>(0);
   const rateLimitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
 
-  const { status, result, dispatch } = useVerification(proof.uri);
+  const { status, result, dispatch } = useVerification(claim.uri);
 
-  const serviceName = SERVICE_NAMES[value.service] || value.service;
-  const isActive = value.status !== "retracted";
+  const serviceName = SERVICE_NAMES[value.type] || value.type;
+  const isActive = !value.retractedAt;
   const recordStatus = isActive ? "active" : "retracted";
 
   const verifyState =
@@ -47,7 +47,7 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
           ? "verified"
           : "failed";
 
-  const borderColour = getProofBorderColour(recordStatus, verifyState);
+  const borderColour = getClaimBorderColour(recordStatus, verifyState);
 
   const triggerVerify = () => {
     const now = Date.now();
@@ -60,7 +60,7 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
       clearTimeout(rateLimitTimerRef.current);
     }
     rateLimitTimerRef.current = setTimeout(() => setRateLimited(false), 1000);
-    void runVerification(proof, dispatch);
+    void runVerification(claim, dispatch);
   };
 
   const handleVerifyClick = (e: React.MouseEvent) => {
@@ -77,7 +77,7 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
         className={`w-full flex items-center justify-between px-4 py-2.5 border-b border-surface-border cursor-pointer bg-transparent transition-colors hover:bg-white/5 border-l-4 ${borderColour} ${collapsed ? "border-b-0" : ""}`}
       >
         <div className="flex items-center gap-2.5">
-          <ServiceIcon service={value.service} size={22} />
+          <ServiceIcon service={value.type} size={22} />
           <span className="font-semibold text-sm">{serviceName}</span>
         </div>
         <ChevronDown
@@ -103,7 +103,9 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
                   <span
                     className={`text-xs ${!isActive ? "text-red-400 font-semibold" : ""}`}
                   >
-                    {value.status ?? "active"}
+                    {value.retractedAt
+                      ? "retracted"
+                      : (value.status ?? "verified")}
                   </span>
                 </td>
               </tr>
@@ -146,23 +148,25 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
               )}
               <tr className="border-b border-surface-border">
                 <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                  Handle
+                  Subject
                 </td>
-                <td className="px-3 py-2 font-medium">{value.handle}</td>
+                <td className="px-3 py-2 font-medium">
+                  {value.identity.subject}
+                </td>
               </tr>
-              {value.proofUrl && (
+              {value.claimUri && (
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                    Proof URL
+                    Claim URI
                   </td>
                   <td className="px-3 py-2">
                     <a
-                      href={value.proofUrl}
+                      href={value.claimUri}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent hover:underline text-xs break-all"
                     >
-                      {value.proofUrl}
+                      {value.claimUri}
                     </a>
                   </td>
                 </tr>
@@ -204,32 +208,20 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
                     Record URI
                   </td>
-                  <td className="px-3 py-2 font-mono break-all">{proof.uri}</td>
+                  <td className="px-3 py-2 font-mono break-all">{claim.uri}</td>
                 </tr>
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
                     CID
                   </td>
-                  <td className="px-3 py-2 font-mono break-all">{proof.cid}</td>
+                  <td className="px-3 py-2 font-mono break-all">{claim.cid}</td>
                 </tr>
-                <tr
-                  className={
-                    value.challengeText ? "border-b border-surface-border" : ""
-                  }
-                >
-                  <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
-                    Nonce
-                  </td>
-                  <td className="px-3 py-2 font-mono">{value.nonce}</td>
-                </tr>
-                {value.challengeText && (
+                {value.nonce && (
                   <tr>
                     <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
-                      Challenge
+                      Nonce
                     </td>
-                    <td className="px-3 py-2 font-mono whitespace-pre-wrap">
-                      {value.challengeText}
-                    </td>
+                    <td className="px-3 py-2 font-mono">{value.nonce}</td>
                   </tr>
                 )}
               </tbody>
@@ -237,8 +229,8 @@ export function DetailedProofCard({ proof }: DetailedProofCardProps) {
 
             {isActive && (
               <div className="px-4 py-4 border-t border-surface-border">
-                <ProofReplayVerification
-                  proof={proof}
+                <ClaimReplayVerification
+                  claim={claim}
                   rateLimited={rateLimited}
                   onReplayClick={triggerVerify}
                 />

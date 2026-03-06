@@ -4,21 +4,25 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
-  listProofs,
-  publishProof,
-  deleteProof,
+  listClaims,
+  publishClaim,
+  deleteClaim,
   listKeys,
   publishKey,
   deleteKey,
+  retractKey,
   parseAtUri,
 } from "@/lib/atproto";
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
+import type {
+  DevKeytraceClaim,
+  DevKeytraceUserPublicKey,
+} from "../../types/keytrace";
 import {
-  AddProofWizard,
-  type PendingProof,
-} from "@/components/Profile/AddProofWizard";
-import { EditProofList } from "@/components/Profile/EditProofList";
+  AddClaimWizard,
+  type PendingClaim,
+} from "@/components/Profile/AddClaimWizard";
+import { EditClaimList } from "@/components/Profile/EditClaimList";
 import {
   AddKeyWizard,
   type PendingKey,
@@ -42,22 +46,22 @@ function useSession() {
 
 export function EditProfilePage() {
   const { data: session, isLoading: sessionLoading } = useSession();
-  const [activeTab, setActiveTab] = useState<"proofs" | "keys">("proofs");
+  const [activeTab, setActiveTab] = useState<"claims" | "keys">("claims");
 
   // Preload openpgp when this page is first visited so it's ready before the user needs it
   useEffect(() => {
     import("openpgp");
   }, []);
 
-  // ── Fetch live proofs ──────────────────────────────────────────────
+  // ── Fetch live claims ──────────────────────────────────────────────
   const {
-    data: existingProofs = [],
-    isLoading: proofsLoading,
-    error: proofsError,
-    refetch: refetchProofs,
-  } = useQuery<AtProtoRecord<MeAttestProof.Main>[]>({
-    queryKey: ["proofs", session?.did],
-    queryFn: () => listProofs(session!.did!),
+    data: existingClaims = [],
+    isLoading: claimsLoading,
+    error: claimsError,
+    refetch: refetchClaims,
+  } = useQuery<AtProtoRecord<DevKeytraceClaim.Main>[]>({
+    queryKey: ["claims", session?.did],
+    queryFn: () => listClaims(session!.did!),
     enabled: !!session?.did,
   });
 
@@ -67,34 +71,36 @@ export function EditProfilePage() {
     isLoading: keysLoading,
     error: keysError,
     refetch: refetchKeys,
-  } = useQuery<AtProtoRecord<MeAttestKey.Main>[]>({
+  } = useQuery<AtProtoRecord<DevKeytraceUserPublicKey.Main>[]>({
     queryKey: ["keys", session?.did],
     queryFn: () => listKeys(session!.did!),
     enabled: !!session?.did,
   });
 
-  // ── Proof edit state ──────────────────────────────────────────────
-  const [proofsToDelete, setProofsToDelete] = useState<Set<string>>(new Set());
-  const [proofsToAdd, setProofsToAdd] = useState<PendingProof[]>([]);
-  const [showProofWizard, setShowProofWizard] = useState(false);
+  // ── Claim edit state ──────────────────────────────────────────────
+  const [claimsToDelete, setClaimsToDelete] = useState<Set<string>>(new Set());
+  const [claimsToAdd, setClaimsToAdd] = useState<PendingClaim[]>([]);
+  const [showClaimWizard, setShowClaimWizard] = useState(false);
 
   // ── Key edit state ────────────────────────────────────────────────
   const [keysToDelete, setKeysToDelete] = useState<Set<string>>(new Set());
+  const [keysToRetract, setKeysToRetract] = useState<Set<string>>(new Set());
   const [keysToAdd, setKeysToAdd] = useState<PendingKey[]>([]);
   const [showKeyWizard, setShowKeyWizard] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
   const isDirty =
-    proofsToDelete.size > 0 ||
-    proofsToAdd.length > 0 ||
+    claimsToDelete.size > 0 ||
+    claimsToAdd.length > 0 ||
     keysToDelete.size > 0 ||
+    keysToRetract.size > 0 ||
     keysToAdd.length > 0;
 
-  // ── Proof handlers ────────────────────────────────────────────────
+  // ── Claim handlers ────────────────────────────────────────────────
 
-  const handleToggleDeleteProof = (uri: string) => {
-    setProofsToDelete((prev) => {
+  const handleToggleDeleteClaim = (uri: string) => {
+    setClaimsToDelete((prev) => {
       const next = new Set(prev);
       if (next.has(uri)) {
         next.delete(uri);
@@ -105,19 +111,31 @@ export function EditProfilePage() {
     });
   };
 
-  const handleRemoveAddProof = (tempId: string) => {
-    setProofsToAdd((prev) => prev.filter((p) => p.tempId !== tempId));
+  const handleRemoveAddClaim = (tempId: string) => {
+    setClaimsToAdd((prev) => prev.filter((p) => p.tempId !== tempId));
   };
 
-  const handleAddProof = (proof: PendingProof) => {
-    setProofsToAdd((prev) => [...prev, proof]);
-    setShowProofWizard(false);
+  const handleAddClaim = (pending: PendingClaim) => {
+    setClaimsToAdd((prev) => [...prev, pending]);
+    setShowClaimWizard(false);
   };
 
   // ── Key handlers ──────────────────────────────────────────────────
 
   const handleToggleDeleteKey = (uri: string) => {
     setKeysToDelete((prev) => {
+      const next = new Set(prev);
+      if (next.has(uri)) {
+        next.delete(uri);
+      } else {
+        next.add(uri);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleRetractKey = (uri: string) => {
+    setKeysToRetract((prev) => {
       const next = new Set(prev);
       if (next.has(uri)) {
         next.delete(uri);
@@ -143,18 +161,18 @@ export function EditProfilePage() {
     setSaving(true);
 
     const ops = [
-      ...[...proofsToDelete].map((uri) => {
+      ...[...claimsToDelete].map((uri) => {
         const { rkey } = parseAtUri(uri);
-        return deleteProof(rkey).catch((e: unknown) => {
+        return deleteClaim(rkey).catch((e: unknown) => {
           throw new Error(
-            `Failed to delete proof: ${e instanceof Error ? e.message : String(e)}`,
+            `Failed to delete claim: ${e instanceof Error ? e.message : String(e)}`,
           );
         });
       }),
-      ...proofsToAdd.map((p) =>
-        publishProof(p.record).catch((e: unknown) => {
+      ...claimsToAdd.map((p) =>
+        publishClaim(p.record).catch((e: unknown) => {
           throw new Error(
-            `Failed to publish proof: ${e instanceof Error ? e.message : String(e)}`,
+            `Failed to publish claim: ${e instanceof Error ? e.message : String(e)}`,
           );
         }),
       ),
@@ -163,6 +181,17 @@ export function EditProfilePage() {
         return deleteKey(rkey).catch((e: unknown) => {
           throw new Error(
             `Failed to delete key: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
+      }),
+      ...[...keysToRetract].map((uri) => {
+        const record = existingKeys.find((k) => k.uri === uri);
+        if (!record) {
+          return Promise.resolve();
+        }
+        return retractKey(record).catch((e: unknown) => {
+          throw new Error(
+            `Failed to retract key: ${e instanceof Error ? e.message : String(e)}`,
           );
         });
       }),
@@ -178,11 +207,12 @@ export function EditProfilePage() {
     try {
       await Promise.all(ops);
       toast.success("Changes saved successfully.");
-      setProofsToDelete(new Set());
-      setProofsToAdd([]);
+      setClaimsToDelete(new Set());
+      setClaimsToAdd([]);
       setKeysToDelete(new Set());
+      setKeysToRetract(new Set());
       setKeysToAdd([]);
-      await Promise.all([refetchProofs(), refetchKeys()]);
+      await Promise.all([refetchClaims(), refetchKeys()]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed.");
     } finally {
@@ -191,10 +221,11 @@ export function EditProfilePage() {
   };
 
   const handleDiscard = () => {
-    setProofsToDelete(new Set());
-    setProofsToAdd([]);
-    setShowProofWizard(false);
+    setClaimsToDelete(new Set());
+    setClaimsToAdd([]);
+    setShowClaimWizard(false);
     setKeysToDelete(new Set());
+    setKeysToRetract(new Set());
     setKeysToAdd([]);
     setShowKeyWizard(false);
   };
@@ -213,7 +244,7 @@ export function EditProfilePage() {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
         <p className="text-muted text-sm">
-          You must be signed in to edit proofs.
+          You must be signed in to edit claims.
         </p>
         <Link to="/" className="text-xs text-accent hover:underline">
           <ArrowLeft className="w-3.5 h-3.5 inline" /> Back
@@ -224,7 +255,7 @@ export function EditProfilePage() {
 
   // ── Render ────────────────────────────────────────────────────────
 
-  const anyWizardOpen = showProofWizard || showKeyWizard;
+  const anyWizardOpen = showClaimWizard || showKeyWizard;
 
   return (
     <div className="flex flex-col gap-4 max-w-xl mx-auto w-full">
@@ -240,11 +271,11 @@ export function EditProfilePage() {
 
       {/* ── Tabs ── */}
       <div className="flex border-b border-surface-border">
-        {(["proofs", "keys"] as const).map((tab) => {
+        {(["claims", "keys"] as const).map((tab) => {
           const pendingCount =
-            tab === "proofs"
-              ? proofsToAdd.length + proofsToDelete.size
-              : keysToAdd.length + keysToDelete.size;
+            tab === "claims"
+              ? claimsToAdd.length + claimsToDelete.size
+              : keysToAdd.length + keysToDelete.size + keysToRetract.size;
           return (
             <button
               key={tab}
@@ -266,39 +297,39 @@ export function EditProfilePage() {
         })}
       </div>
 
-      {/* ── Proofs tab ── */}
-      {activeTab === "proofs" && (
+      {/* ── Claims tab ── */}
+      {activeTab === "claims" && (
         <>
-          {proofsLoading ? (
+          {claimsLoading ? (
             <div className="text-xs text-muted py-4 text-center">
-              Loading proofs…
+              Loading claims…
             </div>
-          ) : proofsError ? (
+          ) : claimsError ? (
             <div className="text-xs text-red-400 py-4 text-center">
-              Failed to load proofs.{" "}
+              Failed to load claims.{" "}
               <button
-                onClick={() => void refetchProofs()}
+                onClick={() => void refetchClaims()}
                 className="underline hover:no-underline"
               >
                 Retry
               </button>
             </div>
           ) : (
-            <EditProofList
-              existing={existingProofs}
-              toDelete={proofsToDelete}
-              toAdd={proofsToAdd}
-              onToggleDelete={handleToggleDeleteProof}
-              onRemoveAdd={handleRemoveAddProof}
+            <EditClaimList
+              existing={existingClaims}
+              toDelete={claimsToDelete}
+              toAdd={claimsToAdd}
+              onToggleDelete={handleToggleDeleteClaim}
+              onRemoveAdd={handleRemoveAddClaim}
             />
           )}
 
-          {!showProofWizard && (
+          {!showClaimWizard && (
             <button
-              onClick={() => setShowProofWizard(true)}
+              onClick={() => setShowClaimWizard(true)}
               className="w-full py-2.5 text-sm border border-dashed border-surface-border text-muted hover:border-accent hover:text-accent transition-colors bg-transparent"
             >
-              + Add proof
+              + Add claim
             </button>
           )}
         </>
@@ -325,8 +356,10 @@ export function EditProfilePage() {
             <EditKeyList
               existing={existingKeys}
               toDelete={keysToDelete}
+              toRetract={keysToRetract}
               toAdd={keysToAdd}
               onToggleDelete={handleToggleDeleteKey}
+              onToggleRetract={handleToggleRetractKey}
               onRemoveAdd={handleRemoveAddKey}
             />
           )}
@@ -342,24 +375,24 @@ export function EditProfilePage() {
         </>
       )}
 
-      {/* ── Proof wizard modal ── */}
-      {showProofWizard && (
+      {/* ── Claim wizard modal ── */}
+      {showClaimWizard && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="proof-wizard-title"
+          aria-labelledby="claim-wizard-title"
         >
           <div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowProofWizard(false)}
+            onClick={() => setShowClaimWizard(false)}
           />
           <div className="relative z-10 w-full max-w-[400px]">
-            <AddProofWizard
+            <AddClaimWizard
               did={session.did!}
               handle={session.handle!}
-              onAdd={handleAddProof}
-              onCancel={() => setShowProofWizard(false)}
+              onAdd={handleAddClaim}
+              onCancel={() => setShowClaimWizard(false)}
             />
           </div>
         </div>
@@ -407,7 +440,7 @@ export function EditProfilePage() {
                 Saving…
               </>
             ) : (
-              `Save changes (${proofsToAdd.length + proofsToDelete.size + keysToAdd.length + keysToDelete.size})`
+              `Save changes (${claimsToAdd.length + claimsToDelete.size + keysToAdd.length + keysToDelete.size + keysToRetract.size})`
             )}
           </button>
         </div>
@@ -416,21 +449,27 @@ export function EditProfilePage() {
       {/* ── Pending summary ── */}
       {isDirty && !anyWizardOpen && (
         <div className="text-xs text-muted space-y-0.5">
-          {proofsToAdd.length > 0 && (
+          {claimsToAdd.length > 0 && (
             <div className="text-green-400">
-              + {proofsToAdd.length} proof{proofsToAdd.length !== 1 ? "s" : ""}{" "}
+              + {claimsToAdd.length} claim{claimsToAdd.length !== 1 ? "s" : ""}{" "}
               to add
             </div>
           )}
-          {proofsToDelete.size > 0 && (
+          {claimsToDelete.size > 0 && (
             <div className="text-red-400">
-              − {proofsToDelete.size} proof
-              {proofsToDelete.size !== 1 ? "s" : ""} to delete
+              − {claimsToDelete.size} claim
+              {claimsToDelete.size !== 1 ? "s" : ""} to delete
             </div>
           )}
           {keysToAdd.length > 0 && (
             <div className="text-green-400">
               + {keysToAdd.length} key{keysToAdd.length !== 1 ? "s" : ""} to add
+            </div>
+          )}
+          {keysToRetract.size > 0 && (
+            <div className="text-orange-400">
+              ⊘ {keysToRetract.size} key{keysToRetract.size !== 1 ? "s" : ""} to
+              retract
             </div>
           )}
           {keysToDelete.size > 0 && (

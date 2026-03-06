@@ -402,7 +402,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                   )}
                   <DropdownMenuItem
                     className={MENU_ITEM_CLASS}
-                    onSelect={() => navigate("/edit/proofs")}
+                    onSelect={() => navigate("/edit/claims")}
                   >
                     Edit profile
                   </DropdownMenuItem>

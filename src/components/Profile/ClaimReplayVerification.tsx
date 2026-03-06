@@ -1,31 +1,31 @@
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof } from "../../../types/lexicons";
+import type { DevKeytraceClaim } from "../../../types/keytrace";
 import { useVerification } from "@/lib/verification-context";
-import { runVerification, VERIFIERS } from "@/lib/run-verification";
+import { runVerification, hasVerifierForUri } from "@/lib/run-verification";
 
-interface ProofReplayVerificationProps {
-  proof: AtProtoRecord<MeAttestProof.Main>;
+interface ClaimReplayVerificationProps {
+  claim: AtProtoRecord<DevKeytraceClaim.Main>;
   // Rate limit window controlled by parent (UI-only)
   rateLimited?: boolean;
   // Called when the replay button is clicked — parent owns rate limit logic
   onReplayClick?: () => void;
 }
 
-export function ProofReplayVerification({
-  proof,
+export function ClaimReplayVerification({
+  claim,
   rateLimited = false,
   onReplayClick,
-}: ProofReplayVerificationProps) {
-  const { status, result, steps, dispatch } = useVerification(proof.uri);
+}: ClaimReplayVerificationProps) {
+  const { status, result, steps, dispatch } = useVerification(claim.uri);
 
   const verifying = status === "loading";
-  const hasVerifier = proof.value.service in VERIFIERS;
+  const hasVerifier = hasVerifierForUri(claim.value.claimUri);
 
   const handleReplay = () => {
     if (verifying || rateLimited) {
       return;
     }
-    void runVerification(proof, dispatch);
+    void runVerification(claim, dispatch);
   };
 
   const handleClick = onReplayClick ?? handleReplay;
@@ -33,7 +33,7 @@ export function ProofReplayVerification({
   if (!hasVerifier) {
     return (
       <div className="text-xs text-muted">
-        No verifier available for {proof.value.service}
+        No verifier available for {claim.value.type}
       </div>
     );
   }
@@ -77,8 +77,8 @@ export function ProofReplayVerification({
           }`}
         >
           {result.success
-            ? "✓ Proof is valid"
-            : `✗ Proof is invalid: ${result.error}`}
+            ? "✓ Claim is valid"
+            : `✗ Claim is invalid: ${result.error}`}
         </div>
       )}
     </div>

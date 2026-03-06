@@ -2,13 +2,16 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link } from "react-router";
 import { useState } from "react";
 import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
-import { SimpleProofCard } from "@/components/Profile/SimpleProofCard";
+import { SimpleClaimCard } from "@/components/Profile/SimpleClaimCard";
 import { NotFoundContent } from "./NotFoundPage";
 import { getProfile } from "@/lib/bsky";
-import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
+import { listClaims, listKeys, type AtProtoRecord } from "@/lib/atproto";
+import type {
+  DevKeytraceClaim,
+  DevKeytraceUserPublicKey,
+} from "../../types/keytrace";
 import { Share2, Check } from "lucide-react";
-import { getProofStatusLabel } from "@/lib/proof-status-label";
+import { getClaimStatusLabel } from "@/lib/claim-status-label";
 import { useVerificationStatuses } from "@/lib/verification-context";
 
 interface ProfileData {
@@ -18,8 +21,8 @@ interface ProfileData {
   description?: string;
   avatar?: string;
   isValid: boolean;
-  proofs: AtProtoRecord<MeAttestProof.Main>[];
-  keys: AtProtoRecord<MeAttestKey.Main>[];
+  claims: AtProtoRecord<DevKeytraceClaim.Main>[];
+  keys: AtProtoRecord<DevKeytraceUserPublicKey.Main>[];
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -29,7 +32,7 @@ export async function profileLoader({
   const handle = params.handle;
 
   if (!handle) {
-    return { handle: "", did: "", isValid: false, proofs: [], keys: [] };
+    return { handle: "", did: "", isValid: false, claims: [], keys: [] };
   }
 
   // Remove @ prefix if present (handle comes from URL like /@manoo.dev)
@@ -45,7 +48,7 @@ export async function profileLoader({
       handle: cleanHandle,
       did: "",
       isValid: false,
-      proofs: [],
+      claims: [],
       keys: [],
     };
   }
@@ -59,14 +62,14 @@ export async function profileLoader({
         handle: cleanHandle,
         did: "",
         isValid: false,
-        proofs: [],
+        claims: [],
         keys: [],
       };
     }
 
-    // Fetch proofs and keys in parallel using the DID
-    const [proofs, keys] = await Promise.all([
-      listProofs(profile.did).catch(() => []),
+    // Fetch claims and keys in parallel using the DID
+    const [claims, keys] = await Promise.all([
+      listClaims(profile.did).catch(() => []),
       listKeys(profile.did).catch(() => []),
     ]);
 
@@ -77,7 +80,7 @@ export async function profileLoader({
       description: profile.description,
       avatar: profile.avatar,
       isValid: true,
-      proofs,
+      claims,
       keys,
     };
   } catch (error) {
@@ -86,7 +89,7 @@ export async function profileLoader({
       handle: cleanHandle,
       did: "",
       isValid: false,
-      proofs: [],
+      claims: [],
       keys: [],
     };
   }
@@ -96,15 +99,15 @@ export async function profileLoader({
 export function ProfilePage() {
   const profile = useLoaderData() as ProfileData;
 
-  const activeProofs = profile.isValid
-    ? profile.proofs.filter((p) => p.value.status !== "retracted")
+  const activeClaims = profile.isValid
+    ? profile.claims.filter((p) => !p.value.retractedAt)
     : [];
 
   const [copied, setCopied] = useState(false);
 
-  // Read statuses for the summary label — each SimpleProofCard manages its
-  // own verification, we just need the statuses for getProofStatusLabel.
-  const proofStatuses = useVerificationStatuses(activeProofs.map((p) => p.uri));
+  // Read statuses for the summary label — each SimpleClaimCard manages its
+  // own verification, we just need the statuses for getClaimStatusLabel.
+  const claimStatuses = useVerificationStatuses(activeClaims.map((p) => p.uri));
 
   if (!profile.isValid) {
     return <NotFoundContent />;
@@ -157,11 +160,11 @@ export function ProfilePage() {
         </div>
 
         {/* Verification Status Label + Share Icon */}
-        {activeProofs.length > 0 &&
+        {activeClaims.length > 0 &&
           (() => {
-            const { label, colour } = getProofStatusLabel(
-              activeProofs.length,
-              proofStatuses,
+            const { label, colour } = getClaimStatusLabel(
+              activeClaims.length,
+              claimStatuses,
             );
             const cls = {
               neutral: "border-surface-border text-muted",
@@ -200,10 +203,10 @@ export function ProfilePage() {
           })()}
 
         {/* Verified Accounts List */}
-        {activeProofs.length > 0 ? (
+        {activeClaims.length > 0 ? (
           <div className="flex flex-col gap-3 w-full">
-            {activeProofs.map((proof) => (
-              <SimpleProofCard key={proof.uri} proof={proof} />
+            {activeClaims.map((claim) => (
+              <SimpleClaimCard key={claim.uri} claim={claim} />
             ))}
           </div>
         ) : (

@@ -6,7 +6,7 @@ interface WizardShellProps {
 }
 
 /**
- * Shared outer chrome for the Add Proof and Add Key wizards:
+ * Shared outer chrome for the Add Claim and Add Key wizards:
  * a header bar with a title + × button, and a padded content area.
  */
 export function WizardShell({

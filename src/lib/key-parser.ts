@@ -1,7 +1,7 @@
 export interface ParsedKey {
   keyType: string;
   fingerprint: string;
-  publicKey: string;
+  publicKeyArmored: string;
   comment?: string;
   expiresAt?: string;
   algorithm?: string;
@@ -49,7 +49,7 @@ export async function parsePGPKey(armoredKey: string): Promise<ParsedKey> {
   return {
     keyType: "pgp",
     fingerprint,
-    publicKey: armoredKey.trim(),
+    publicKeyArmored: armoredKey.trim(),
     comment,
     expiresAt,
     algorithm: key.getAlgorithmInfo().algorithm,
@@ -95,7 +95,7 @@ export async function parseSSHKey(sshKey: string): Promise<ParsedKey> {
   return {
     keyType,
     fingerprint,
-    publicKey: trimmed,
+    publicKeyArmored: trimmed,
     comment,
     algorithm,
   };
@@ -103,7 +103,7 @@ export async function parseSSHKey(sshKey: string): Promise<ParsedKey> {
 
 /**
  * Auto-detect and parse any supported key type.
- * Supported types are defined by the me.attest.key lexicon: pgp, ssh-ed25519, ssh-ecdsa.
+ * Supported types are defined by the dev.keytrace.userPublicKey lexicon: pgp, ssh-ed25519, ssh-ecdsa.
  */
 export async function parseKey(keyData: string): Promise<ParsedKey> {
   const trimmed = keyData.trim();

@@ -73,6 +73,24 @@ function createStoreAdapter<K extends string, V>(
 
 let oauthClient: OAuthClient;
 
+// Cache restored OAuth sessions to avoid repeated DID resolution
+const sessionCache = new Map<string, { session: OAuthSession; expiresAt: number }>();
+const SESSION_CACHE_TTL_MS = 60_000; // 1 minute
+
+export async function restoreSession(did: Did): Promise<OAuthSession> {
+  const cached = sessionCache.get(did);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.session;
+  }
+
+  const session = await oauthClient.restore(did);
+  sessionCache.set(did, {
+    session,
+    expiresAt: Date.now() + SESSION_CACHE_TTL_MS,
+  });
+  return session;
+}
+
 export function initializeOAuthClient(): OAuthClient {
   if (oauthClient) {
     return oauthClient;

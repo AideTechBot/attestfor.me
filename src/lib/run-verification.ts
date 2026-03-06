@@ -1,34 +1,116 @@
+import {
+  createClaim,
+  verifyClaim,
+  ClaimStatus,
+  serviceProviders,
+} from "@keytrace/runner";
+import type { ClaimVerificationResult } from "@keytrace/runner";
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof } from "../../types/lexicons";
-import { GitHubVerifier } from "@/lib/verifiers/github";
-import { TwitterVerifier } from "@/lib/verifiers/twitter";
-import type { BaseProofVerifier } from "@/lib/verifiers/base-verifier";
+import type { DevKeytraceClaim } from "../../types/keytrace";
 import type {
   VerificationAction,
   VerificationStep,
 } from "@/lib/verification-context";
+import { createProxiedFetch } from "@/lib/proxied-fetch";
+import { getApiBase } from "@/lib/get-api-base";
 
-const VERIFIERS: Record<string, () => BaseProofVerifier> = {
-  github: () => new GitHubVerifier(),
-  twitter: () => new TwitterVerifier(),
-};
+// ── Helpers ──────────────────────────────────────────────────────
 
-export { VERIFIERS };
+/**
+ * Generate a user-friendly error message from verification result.
+ * Exported so it can be used in AddClaimWizard as well.
+ */
+export function getVerifyErrorMessage(result: ClaimVerificationResult): string {
+  // If there are explicit errors, use them
+  if (result.errors.length > 0) {
+    return result.errors.join("; ");
+  }
+
+  const details = result.proofDetails;
+  if (!details?.targets) {
+    return "Verification failed — no proof content was found.";
+  }
+
+  // Check if any target path had values
+  const targetsWithValues = details.targets.filter(
+    (t) => t.valuesFound && t.valuesFound.length > 0,
+  );
+
+  if (targetsWithValues.length === 0) {
+    // No expected files/paths were found
+    const expectedPaths = details.targets
+      .map((t) => t.path.join("."))
+      .filter((p) => p.includes("files."))
+      .map((p) => p.replace("files.", "").replace(".content", ""));
+
+    if (expectedPaths.length > 0) {
+      return `No expected file found. Please name your file one of: ${expectedPaths.join(", ")}`;
+    }
+    return "No proof content was found at the expected location.";
+  }
+
+  // Values were found but DID wasn't in them
+  return "DID not found in claim content. Make sure the proof text matches exactly.";
+}
+
+/**
+ * Build a `Set` of service IDs that have a registered provider in the runner.
+ */
+const ALL_PROVIDERS = serviceProviders.getAllProviders();
+export const SUPPORTED_SERVICES = new Set(ALL_PROVIDERS.map((p) => p.id));
+
+/**
+ * Check whether the runner has a provider that matches a given claim URI.
+ */
+export function hasVerifierForUri(claimUri: string): boolean {
+  return serviceProviders.matchUri(claimUri).length > 0;
+}
+
+/**
+ * Verify DNS claim using server-side endpoint (browser can't do DNS lookups).
+ * Returns true if DID found in TXT records, false otherwise.
+ */
+async function verifyDnsViaServer(domain: string, did: string): Promise<boolean> {
+  const apiBase = getApiBase();
+  const response = await fetch(
+    `${apiBase}/api/dns?domain=${encodeURIComponent(domain)}`,
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "DNS lookup failed");
+  }
+
+  const data = (await response.json()) as {
+    records: { txt: string[] };
+  };
+
+  // Check if any TXT record contains the DID
+  const provider = serviceProviders.getProvider("dns");
+  const proofText = provider?.getProofText(did) ?? did;
+
+  return data.records.txt.some(
+    (record) => record.includes(did) || record.includes(proofText),
+  );
+}
+
+// ── Main entry point ─────────────────────────────────────────────
 
 export async function runVerification(
-  proof: AtProtoRecord<MeAttestProof.Main>,
+  claim: AtProtoRecord<DevKeytraceClaim.Main>,
   dispatch: React.Dispatch<VerificationAction>,
 ): Promise<void> {
-  const { uri, value } = proof;
-  const factory = VERIFIERS[value.service];
+  const { uri, value } = claim;
 
-  if (!factory) {
+  // Quick check: does the runner recognise this claim URI?
+  const matches = serviceProviders.matchUri(value.claimUri);
+  if (matches.length === 0) {
     dispatch({
       type: "VERIFY_DONE",
       uri,
       result: {
         success: false,
-        error: `No verifier available for ${value.service}`,
+        error: `No verifier available for "${value.type}"`,
         errorCode: "NO_VERIFIER",
       },
       steps: [],
@@ -57,63 +139,127 @@ export async function runVerification(
     status: VerificationStep["status"],
     message: string,
   ) => {
-    currentSteps[currentSteps.length - 1] = {
-      ...currentSteps[currentSteps.length - 1],
-      status,
-      message,
-    };
-    // Re-dispatch VERIFY_STEP with the updated step — the reducer appends,
-    // so we pass the full accumulated list via VERIFY_DONE at the end.
-    // For live step updates we use a VERIFY_STEP_UPDATE action pattern instead:
-    // here we just mutate in place and the final VERIFY_DONE carries the corrected steps.
+    if (currentSteps.length > 0) {
+      currentSteps[currentSteps.length - 1] = {
+        ...currentSteps[currentSteps.length - 1],
+        status,
+        message,
+      };
+    }
   };
 
-  try {
-    addStep("Validate URL", "pending", "Checking proof URL format…");
-    const verifier = factory();
-    const urlValid = verifier.validateProofUrl(value.proofUrl);
+  // Extract the DID from the AT URI (at://did:plc:xxx/collection/rkey)
+  const did = uri.startsWith("at://") ? uri.split("/")[2] : "";
 
-    if (!urlValid) {
-      updateLastStep("error", "Invalid proof URL format");
+  try {
+    // Step 1: Match claim URI
+    addStep("Match claim", "pending", "Checking claim URI against providers…");
+    const provider = matches[0].provider;
+    updateLastStep("success", `Matched provider: ${provider.name}`);
+
+    // Step 2: Verify claim
+    addStep("Verify claim", "pending", "Fetching claim content and verifying…");
+
+    // DNS claims need special handling (browser can't do DNS lookups)
+    if (value.type === "dns" && value.claimUri.startsWith("dns:")) {
+      const domain = value.claimUri.replace("dns:", "");
+      const verified = await verifyDnsViaServer(domain, did);
+
+      if (verified) {
+        updateLastStep("success", "DID found in DNS TXT records");
+
+        dispatch({
+          type: "VERIFY_DONE",
+          uri,
+          result: { success: true },
+          steps: [...currentSteps],
+        });
+      } else {
+        updateLastStep(
+          "error",
+          `No matching TXT record found at _keytrace.${domain}`,
+        );
+
+        dispatch({
+          type: "VERIFY_DONE",
+          uri,
+          result: {
+            success: false,
+            error: `No matching TXT record found at _keytrace.${domain}`,
+            errorCode: "VERIFICATION_FAILED",
+          },
+          steps: [...currentSteps],
+        });
+      }
+      return;
+    }
+
+    // For other services, use keytrace runner
+    const claim = createClaim(value.claimUri, did);
+    const result: ClaimVerificationResult = await verifyClaim(claim, {
+      fetch: createProxiedFetch(),
+    });
+
+    if (result.status === ClaimStatus.VERIFIED) {
+      updateLastStep("success", "DID found in claim content");
+
+      // Step 3: Handle check (attestfor.me-specific)
+      addStep("Check handle", "pending", "Verifying identity handle…");
+
+      const expectedHandle = value.identity.subject
+        .toLowerCase()
+        .replace(/^@/, "");
+      const actualSubject = result.identity?.subject
+        ?.toLowerCase()
+        .replace(/^@/, "");
+
+      if (actualSubject && actualSubject !== expectedHandle) {
+        updateLastStep(
+          "error",
+          `Handle mismatch: expected "${expectedHandle}", got "${actualSubject}"`,
+        );
+        dispatch({
+          type: "VERIFY_DONE",
+          uri,
+          result: {
+            success: false,
+            error: `Handle mismatch: expected "${expectedHandle}", got "${actualSubject}"`,
+            errorCode: "HANDLE_MISMATCH",
+          },
+          steps: [...currentSteps],
+        });
+        return;
+      }
+
+      updateLastStep(
+        "success",
+        `Handle verified: ${result.identity?.subject ?? expectedHandle}`,
+      );
+
+      dispatch({
+        type: "VERIFY_DONE",
+        uri,
+        result: { success: true },
+        steps: [...currentSteps],
+      });
+    } else {
+      const errorMsg = getVerifyErrorMessage(result);
+      updateLastStep("error", errorMsg);
+
       dispatch({
         type: "VERIFY_DONE",
         uri,
         result: {
           success: false,
-          error: "Invalid proof URL format",
-          errorCode: "INVALID_URL",
+          error: errorMsg,
+          errorCode:
+            result.status === ClaimStatus.ERROR
+              ? "PROVIDER_ERROR"
+              : "VERIFICATION_FAILED",
         },
         steps: [...currentSteps],
       });
-      return;
     }
-    updateLastStep("success", "Proof URL format is valid");
-
-    addStep("Check handle", "pending", "Validating handle…");
-    const normalizedHandle = verifier.normalizeHandle(value.handle);
-    updateLastStep("success", `Handle: ${normalizedHandle}`);
-
-    addStep("Verify proof", "pending", "Fetching proof content and verifying…");
-    const challengeText = value.challengeText || "";
-    const verificationResult = await verifier.verify(
-      value.proofUrl,
-      challengeText,
-      value.handle,
-    );
-
-    updateLastStep(
-      verificationResult.success ? "success" : "error",
-      verificationResult.success
-        ? "Challenge text found and verified"
-        : verificationResult.error || "Verification failed",
-    );
-
-    dispatch({
-      type: "VERIFY_DONE",
-      uri,
-      result: verificationResult,
-      steps: [...currentSteps],
-    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     currentSteps.push({ step: "Error", status: "error", message });

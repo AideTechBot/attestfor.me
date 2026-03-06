@@ -1,10 +1,10 @@
 import { useState } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestKey } from "../../../types/lexicons";
+import type { DevKeytraceUserPublicKey } from "../../../types/keytrace";
 import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
 interface KeyCardProps {
-  keyRecord: AtProtoRecord<MeAttestKey.Main>;
+  keyRecord: AtProtoRecord<DevKeytraceUserPublicKey.Main>;
 }
 
 const KEY_ICONS: Record<string, string> = {
@@ -30,10 +30,10 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
   const typeLabel = KEY_TYPE_LABELS[value.keyType] || value.keyType;
   const isExpired =
     value.expiresAt != null && new Date(value.expiresAt) < new Date();
-  const isRevoked = value.status === "revoked";
+  const isRevoked = !!value.retractedAt;
 
   const copyPublicKey = async () => {
-    await navigator.clipboard.writeText(value.publicKey);
+    await navigator.clipboard.writeText(value.publicKeyArmored);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -57,7 +57,7 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
               : "bg-yellow-500/10 text-yellow-400"
           }`}
         >
-          {isRevoked ? "Revoked" : "Expired"}
+          {isRevoked ? "Retracted" : "Expired"}
         </div>
       )}
 
@@ -123,7 +123,7 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
         {expanded && (
           <div className="mt-4 pt-4 border-t border-surface-border">
             <pre className="text-xs font-mono whitespace-pre-wrap break-all bg-page p-3 border border-surface-border overflow-x-auto max-h-64 overflow-y-auto m-0">
-              {value.publicKey}
+              {value.publicKeyArmored}
             </pre>
           </div>
         )}

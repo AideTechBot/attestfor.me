@@ -1,0 +1,165 @@
+diff --git a/dist/claim.js b/dist/claim.js
+index 3f703c616c3161e9df20c237136ac94bfdbaf0c6..c4e948eb78ef0ed443a4aac0086a7ad22bc9b173 100644
+--- a/dist/claim.js
++++ b/dist/claim.js
+@@ -128,6 +128,7 @@ async function fetchProof(request, opts) {
+         format: request.format,
+         timeout: opts.timeout ?? DEFAULT_TIMEOUT,
+         headers: request.options?.headers,
++        fetchFn: opts.fetch,
+     });
+     const fileKeys = data && typeof data === "object" && "files" in data ? Object.keys(data.files) : [];
+     console.log(`[runner] Fetched proof, files: ${JSON.stringify(fileKeys)}`);
+diff --git a/dist/fetchers/activitypub.d.ts b/dist/fetchers/activitypub.d.ts
+index e7262d3ced9a0651d187bd6cf638c219e20a2d02..4cf2f92ba2e222f1430fa68d8b99a178b731f85b 100644
+--- a/dist/fetchers/activitypub.d.ts
++++ b/dist/fetchers/activitypub.d.ts
+@@ -13,6 +13,8 @@ export interface ActivityPubActor {
+ }
+ export interface ActivityPubFetchOptions {
+     timeout?: number;
++    /** Custom fetch function (defaults to globalThis.fetch) */
++    fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+ }
+ /**
+  * Fetch an ActivityPub actor document
+diff --git a/dist/fetchers/activitypub.js b/dist/fetchers/activitypub.js
+index 86b4d1b375d907d0c5c3559272be97d67c5c4991..8cb8f644525968d4ba2a85faa2f901c4800394f5 100644
+--- a/dist/fetchers/activitypub.js
++++ b/dist/fetchers/activitypub.js
+@@ -6,8 +6,9 @@ export async function fetchActor(uri, options = {}) {
+     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), timeout);
++    const doFetch = options.fetchFn ?? globalThis.fetch;
+     try {
+-        const response = await globalThis.fetch(uri, {
++        const response = await doFetch(uri, {
+             headers: {
+                 Accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
+                 "User-Agent": "keytrace-runner/1.0",
+diff --git a/dist/fetchers/http.d.ts b/dist/fetchers/http.d.ts
+index 69681774a5cbdb163ceefb14d1049c0b09c1f3c0..75718fd673ef2e87631a79ff7560ef976c4509dd 100644
+--- a/dist/fetchers/http.d.ts
++++ b/dist/fetchers/http.d.ts
+@@ -2,6 +2,8 @@ export interface HttpFetchOptions {
+     format: "json" | "text" | "json-ld" | "og-meta";
+     headers?: Record<string, string>;
+     timeout?: number;
++    /** Custom fetch function (defaults to globalThis.fetch) */
++    fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+ }
+ /**
+  * Fetch data from an HTTP/HTTPS URL
+diff --git a/dist/fetchers/http.js b/dist/fetchers/http.js
+index e567f527b67666fdcfd070859242a37d77a0b793..15a90ef4f71c212f852b02a841f06b1ed0a6bd5d 100644
+--- a/dist/fetchers/http.js
++++ b/dist/fetchers/http.js
+@@ -7,8 +7,9 @@ export async function fetch(url, options) {
+     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), timeout);
++    const doFetch = options.fetchFn ?? globalThis.fetch;
+     try {
+-        const response = await globalThis.fetch(url, {
++        const response = await doFetch(url, {
+             headers: {
+                 "User-Agent": "keytrace-runner/1.0",
+                 Accept: options.format === "json" ? "application/json" : "text/html",
+diff --git a/dist/types.d.ts b/dist/types.d.ts
+index bbfa0b6603c2a22e79260cef401cc5ecda1f70da..1a8b958517779ac49f6bd5861ebcaa96a41c56d8 100644
+--- a/dist/types.d.ts
++++ b/dist/types.d.ts
+@@ -95,6 +95,8 @@ export interface VerifyOptions {
+     skipCache?: boolean;
+     /** Proxy URL for browser-based DNS/HTTP requests */
+     proxyUrl?: string;
++    /** Custom fetch function (e.g. for CORS proxying in browsers) */
++    fetch?: FetchFn;
+     /** Trusted signer handles whose signing keys are accepted (default: ["keytrace.dev"]) */
+     trustedSigners?: string[];
+ }
+diff --git a/src/claim.ts b/src/claim.ts
+index f10d76c7e6371d1816a479af41169cf4cc98abc7..70245e2a072dc6cb6431cfc8534d2e32e52b55dd 100644
+--- a/src/claim.ts
++++ b/src/claim.ts
+@@ -158,6 +158,7 @@ async function fetchProof(request: ProofRequest, opts: VerifyOptions): Promise<u
+     format: request.format,
+     timeout: opts.timeout ?? DEFAULT_TIMEOUT,
+     headers: request.options?.headers,
++    fetchFn: opts.fetch,
+   });
+   const fileKeys = data && typeof data === "object" && "files" in data ? Object.keys((data as Record<string, unknown>).files as object) : [];
+   console.log(`[runner] Fetched proof, files: ${JSON.stringify(fileKeys)}`);
+diff --git a/src/fetchers/activitypub.ts b/src/fetchers/activitypub.ts
+index 1797e1fd3a5106cd4d4edffd164831e56f548918..f3c0e558dad179554cccae766b5a2605daa6e947 100644
+--- a/src/fetchers/activitypub.ts
++++ b/src/fetchers/activitypub.ts
+@@ -16,6 +16,8 @@ export interface ActivityPubActor {
+ 
+ export interface ActivityPubFetchOptions {
+   timeout?: number;
++  /** Custom fetch function (defaults to globalThis.fetch) */
++  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+ }
+ 
+ /**
+@@ -25,9 +27,10 @@ export async function fetchActor(uri: string, options: ActivityPubFetchOptions =
+   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+   const controller = new AbortController();
+   const timeoutId = setTimeout(() => controller.abort(), timeout);
++    const doFetch = options.fetchFn ?? globalThis.fetch;
+ 
+   try {
+-    const response = await globalThis.fetch(uri, {
++    const response = await doFetch(uri, {
+       headers: {
+         Accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
+         "User-Agent": "keytrace-runner/1.0",
+diff --git a/src/fetchers/http.ts b/src/fetchers/http.ts
+index cc7f910918739ddc90df173e21c87e528134559d..8ebc4bb14dfd42c4f7b44a797c2e3db3fe0c484d 100644
+--- a/src/fetchers/http.ts
++++ b/src/fetchers/http.ts
+@@ -5,6 +5,8 @@ export interface HttpFetchOptions {
+   format: "json" | "text" | "json-ld" | "og-meta";
+   headers?: Record<string, string>;
+   timeout?: number;
++  /** Custom fetch function (defaults to globalThis.fetch) */
++  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+ }
+ 
+ /**
+@@ -14,9 +16,10 @@ export async function fetch(url: string, options: HttpFetchOptions): Promise<unk
+   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+   const controller = new AbortController();
+   const timeoutId = setTimeout(() => controller.abort(), timeout);
++    const doFetch = options.fetchFn ?? globalThis.fetch;
+ 
+   try {
+-    const response = await globalThis.fetch(url, {
++    const response = await doFetch(url, {
+       headers: {
+         "User-Agent": "keytrace-runner/1.0",
+         Accept: options.format === "json" ? "application/json" : "text/html",
+diff --git a/src/types.ts b/src/types.ts
+index ffc6e1d6b08203359aed53b75cc545d59aa85d87..72a5b27d675b44aed57ea9c14c3407e310a02f38 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -96,6 +96,8 @@ export interface VerifyOptions {
+   skipCache?: boolean;
+   /** Proxy URL for browser-based DNS/HTTP requests */
+   proxyUrl?: string;
++  /** Custom fetch function (e.g. for CORS proxying in browsers) */
++  fetch?: FetchFn;
+   /** Trusted signer handles whose signing keys are accepted (default: ["keytrace.dev"]) */
+   trustedSigners?: string[];
+ }
+@@ -126,8 +128,6 @@ export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
+ 
+ /** Configuration for the recipe runner */
+ export interface RunnerConfig {
+-  /** Custom fetch function (defaults to global fetch) */
+-  fetch?: FetchFn;
+   /** Request timeout in ms (default: 10000) */
+   timeout?: number;
+ }

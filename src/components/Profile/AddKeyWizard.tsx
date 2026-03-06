@@ -2,8 +2,8 @@ import { useState, useCallback } from "react";
 import { FileUp, KeyRound, ArrowRight } from "lucide-react";
 import { WizardShell } from "./WizardShell";
 import { parseKey, type ParsedKey } from "@/lib/key-parser";
-import type { MeAttestKey } from "../../../types/lexicons";
-import { LEXICON_NS } from "@/lib/constants";
+import type { DevKeytraceUserPublicKey } from "../../../types/keytrace";
+import { ids } from "../../../types/keytrace";
 import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ import { KEY_TYPE_LABELS } from "@/lib/global-features";
 export interface PendingKey {
   /** Temporary client-side id — not the final rkey */
   tempId: string;
-  record: MeAttestKey.Main;
+  record: DevKeytraceUserPublicKey.Main;
   parsed: ParsedKey;
 }
 
@@ -65,15 +65,14 @@ export function AddKeyWizard({ onAdd, onCancel }: AddKeyWizardProps) {
       return;
     }
 
-    const record: MeAttestKey.Main = {
-      $type: `${LEXICON_NS}.key`,
+    const record: DevKeytraceUserPublicKey.Main = {
+      $type: ids.DevKeytraceUserPublicKey,
       keyType: parsed.keyType,
       fingerprint: parsed.fingerprint,
-      publicKey: parsed.publicKey,
+      publicKeyArmored: parsed.publicKeyArmored,
       label: label.trim() || undefined,
       comment: parsed.comment,
       expiresAt: parsed.expiresAt,
-      status: "active",
       createdAt: new Date().toISOString(),
     };
 

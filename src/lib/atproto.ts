@@ -108,13 +108,13 @@ export async function listRecords<T = Record<string, unknown>>(
   };
 }
 
-// ── Proof-specific helpers ─────────────────────────────────────────
+// ── Claim & key helpers ────────────────────────────────────────────
 
-import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
-import { LEXICON_NS } from "./constants";
-
-const PROOF_COLLECTION = `${LEXICON_NS}.proof` as const;
-const KEY_COLLECTION = `${LEXICON_NS}.key` as const;
+import type {
+  DevKeytraceClaim,
+  DevKeytraceUserPublicKey,
+} from "../../types/keytrace";
+import { ids } from "../../types/keytrace";
 
 // ── Authenticated writes (via server proxy) ────────────────────────
 
@@ -164,23 +164,50 @@ export async function deleteRecord(
 }
 
 /**
- * List all proofs for a DID
+ * Update an existing record in the authenticated user's repo.
+ * Goes through the server proxy because OAuth tokens/DPoP keys are server-side.
  */
-export async function listProofs(
+export async function putRecord(
+  collection: string,
+  rkey: string,
+  record: Record<string, unknown>,
+): Promise<{ uri: string; cid: string }> {
+  const response = await fetch("/api/repo/putRecord", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ collection, rkey, record }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * List all claims for a DID
+ */
+export async function listClaims(
   did: string,
-): Promise<AtProtoRecord<MeAttestProof.Main>[]> {
-  const result = await listRecords<MeAttestProof.Main>(did, PROOF_COLLECTION);
+): Promise<AtProtoRecord<DevKeytraceClaim.Main>[]> {
+  const result = await listRecords<DevKeytraceClaim.Main>(
+    did,
+    ids.DevKeytraceClaim,
+  );
   return result.records;
 }
 
 /**
- * Get a single proof by rkey
+ * Get a single claim by rkey
  */
-export async function getProof(
+export async function getClaim(
   did: string,
   rkey: string,
-): Promise<AtProtoRecord<MeAttestProof.Main>> {
-  return getRecord<MeAttestProof.Main>(did, PROOF_COLLECTION, rkey);
+): Promise<AtProtoRecord<DevKeytraceClaim.Main>> {
+  return getRecord<DevKeytraceClaim.Main>(did, ids.DevKeytraceClaim, rkey);
 }
 
 // ── Key-specific helpers ───────────────────────────────────────────
@@ -190,8 +217,11 @@ export async function getProof(
  */
 export async function listKeys(
   did: string,
-): Promise<AtProtoRecord<MeAttestKey.Main>[]> {
-  const result = await listRecords<MeAttestKey.Main>(did, KEY_COLLECTION);
+): Promise<AtProtoRecord<DevKeytraceUserPublicKey.Main>[]> {
+  const result = await listRecords<DevKeytraceUserPublicKey.Main>(
+    did,
+    ids.DevKeytraceUserPublicKey,
+  );
   return result.records;
 }
 
@@ -201,18 +231,22 @@ export async function listKeys(
 export async function getKey(
   did: string,
   rkey: string,
-): Promise<AtProtoRecord<MeAttestKey.Main>> {
-  return getRecord<MeAttestKey.Main>(did, KEY_COLLECTION, rkey);
+): Promise<AtProtoRecord<DevKeytraceUserPublicKey.Main>> {
+  return getRecord<DevKeytraceUserPublicKey.Main>(
+    did,
+    ids.DevKeytraceUserPublicKey,
+    rkey,
+  );
 }
 
 /**
  * Publish a key to the authenticated user's repo (via server proxy)
  */
 export async function publishKey(
-  record: MeAttestKey.Main,
+  record: DevKeytraceUserPublicKey.Main,
 ): Promise<{ uri: string; cid: string }> {
   return createRecord(
-    KEY_COLLECTION,
+    ids.DevKeytraceUserPublicKey,
     record as unknown as Record<string, unknown>,
   );
 }
@@ -221,25 +255,42 @@ export async function publishKey(
  * Delete a key from the authenticated user's repo (via server proxy)
  */
 export async function deleteKey(rkey: string): Promise<void> {
-  return deleteRecord(KEY_COLLECTION, rkey);
+  return deleteRecord(ids.DevKeytraceUserPublicKey, rkey);
 }
 
 /**
- * Publish a proof to the authenticated user's repo (via server proxy).
- * (Unblocks the Phase 2 gap — proof creation was not wired up)
+ * Retract a key by setting retractedAt (via server proxy).
  */
-export async function publishProof(
-  record: MeAttestProof.Main,
+export async function retractKey(
+  record: AtProtoRecord<DevKeytraceUserPublicKey.Main>,
+): Promise<{ uri: string; cid: string }> {
+  const { rkey } = parseAtUri(record.uri);
+  const updated: DevKeytraceUserPublicKey.Main = {
+    ...record.value,
+    retractedAt: new Date().toISOString(),
+  };
+  return putRecord(
+    ids.DevKeytraceUserPublicKey,
+    rkey,
+    updated as unknown as Record<string, unknown>,
+  );
+}
+
+/**
+ * Publish a claim to the authenticated user's repo (via server proxy).
+ */
+export async function publishClaim(
+  record: DevKeytraceClaim.Main,
 ): Promise<{ uri: string; cid: string }> {
   return createRecord(
-    PROOF_COLLECTION,
+    ids.DevKeytraceClaim,
     record as unknown as Record<string, unknown>,
   );
 }
 
 /**
- * Delete a proof from the authenticated user's repo (via server proxy)
+ * Delete a claim from the authenticated user's repo (via server proxy)
  */
-export async function deleteProof(rkey: string): Promise<void> {
-  return deleteRecord(PROOF_COLLECTION, rkey);
+export async function deleteClaim(rkey: string): Promise<void> {
+  return deleteRecord(ids.DevKeytraceClaim, rkey);
 }

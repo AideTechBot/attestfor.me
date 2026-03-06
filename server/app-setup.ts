@@ -1,10 +1,12 @@
 import fastifyCookie from "@fastify/cookie";
-import { oauthClient, getSession, setSession, deleteSession } from "./oauth";
+import { oauthClient, restoreSession, getSession, setSession, deleteSession } from "./oauth";
 import { store } from "./storage";
 import { SESSION_PROFILE_TTL } from "./cache-ttl";
 import { SESSION_COOKIE_NAME } from "../src/lib/constants";
 import { proxyTwitterGraphQL } from "./routes/twitter-proxy";
 import { registerRepoProxy } from "./routes/repo-proxy";
+import { registerFetchProxy } from "./routes/fetch-proxy";
+import { registerDnsLookup } from "./routes/dns-lookup";
 
 import type { FastifyInstance } from "fastify";
 import type { Handle } from "@atcute/lexicons";
@@ -227,8 +229,8 @@ export async function setupApp(app: FastifyInstance) {
     }
 
     try {
-      // restore() throws if session is invalid/expired
-      await oauthClient.restore(sessionData.did);
+      // restoreSession() throws if session is invalid/expired (cached for 1 min)
+      await restoreSession(sessionData.did);
 
       // Check cache for session profile data
       const sessionCacheKey = `sessionProfile:${sessionData.did}`;
@@ -280,6 +282,14 @@ export async function setupApp(app: FastifyInstance) {
     },
     proxyTwitterGraphQL,
   );
+
+  // ── Generic fetch proxy for client-side verification ────────────
+
+  registerFetchProxy(app);
+
+  // ── DNS lookup for client-side verification ─────────────────────
+
+  registerDnsLookup(app);
 
   // ── Repo write proxy (authenticated) ────────────────────────────
 

@@ -1,5 +1,5 @@
 /**
- * Returns the Tailwind border-left colour class for a proof card strip.
+ * Returns the Tailwind border-left colour class for a claim card strip.
  *
  * Rules (in priority order):
  *  1. retracted  → always red, regardless of verification state
@@ -9,12 +9,12 @@
  *  5. unattempted (idle/null) → light grey
  */
 
-export type ProofCardVerifyState = "idle" | "loading" | "verified" | "failed";
-export type ProofRecordStatus = "active" | "retracted";
+export type ClaimCardVerifyState = "idle" | "loading" | "verified" | "failed";
+export type ClaimRecordStatus = "active" | "retracted";
 
-export function getProofBorderColour(
-  recordStatus: ProofRecordStatus,
-  verifyState: ProofCardVerifyState | null,
+export function getClaimBorderColour(
+  recordStatus: ClaimRecordStatus,
+  verifyState: ClaimCardVerifyState | null,
 ): string {
   if (recordStatus === "retracted") {
     return "border-l-red-500";

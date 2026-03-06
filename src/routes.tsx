@@ -25,7 +25,7 @@ export const routes: RouteObject[] = [
         element: <FaqPage />,
       },
       {
-        path: "/edit/proofs",
+        path: "/edit/claims",
         element: <EditProfilePage />,
       },
       {

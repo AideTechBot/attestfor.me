@@ -1,5 +1,11 @@
 import { createContext, useContext, useReducer, type ReactNode } from "react";
-import type { VerificationResult } from "@/lib/verifiers/base-verifier";
+
+/** Simple result shape used by attestfor.me's verification UI. */
+export interface VerificationResult {
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+}
 
 export type VerifyStatus = "idle" | "loading" | "verified" | "failed";
 
@@ -9,13 +15,13 @@ export interface VerificationStep {
   message: string;
 }
 
-export interface ProofVerifyState {
+export interface ClaimVerifyState {
   status: VerifyStatus;
   result: VerificationResult | null;
   steps: VerificationStep[];
 }
 
-type VerificationStore = Record<string, ProofVerifyState>;
+type VerificationStore = Record<string, ClaimVerifyState>;
 
 export type VerificationAction =
   | { type: "VERIFY_START"; uri: string }
@@ -28,7 +34,7 @@ export type VerificationAction =
     }
   | { type: "VERIFY_RESET"; uri: string };
 
-const DEFAULT_STATE: ProofVerifyState = {
+const DEFAULT_STATE: ClaimVerifyState = {
   status: "idle",
   result: null,
   steps: [],
@@ -91,7 +97,7 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useVerification(uri: string): ProofVerifyState & {
+export function useVerification(uri: string): ClaimVerifyState & {
   dispatch: React.Dispatch<VerificationAction>;
 } {
   const ctx = useContext(VerificationContext);
@@ -104,7 +110,7 @@ export function useVerification(uri: string): ProofVerifyState & {
   return { ...state, dispatch: ctx.dispatch };
 }
 
-/** Read the VerifyStatus for a list of proof URIs in a single hook call. */
+/** Read the VerifyStatus for a list of claim URIs in a single hook call. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useVerificationStatuses(uris: string[]): VerifyStatus[] {
   const ctx = useContext(VerificationContext);

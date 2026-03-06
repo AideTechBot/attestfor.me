@@ -2,27 +2,27 @@ import type { VerifyStatus } from "./verification-context";
 
 export type StatusColour = "neutral" | "green" | "yellow" | "red";
 
-export interface ProofStatusLabel {
+export interface ClaimStatusLabel {
   label: string;
   colour: StatusColour;
 }
 
 /**
- * Derives the summary label and colour for a set of proof verification statuses.
+ * Derives the summary label and colour for a set of claim verification statuses.
  *
  * Rules:
  *   - Nothing attempted (no verified, no failed) → neutral grey
  *   - At least one failed, zero verified          → red
- *   - Some verified, rest don't matter            → yellow
- *   - All proofs verified (only green case)       → green
+ *   - Some verified, rest don’t matter            → yellow
+ *   - All claims verified (only green case)       → green
  *
- * When there are unattempted (idle/loading) proofs, "· N unknown" is appended
- * to the label (omitted when every proof has a final result).
+ * When there are unattempted (idle/loading) claims, "· N unknown" is appended
+ * to the label (omitted when every claim has a final result).
  */
-export function getProofStatusLabel(
+export function getClaimStatusLabel(
   total: number,
   statuses: VerifyStatus[],
-): ProofStatusLabel {
+): ClaimStatusLabel {
   const verified = statuses.filter((s) => s === "verified").length;
   const failed = statuses.filter((s) => s === "failed").length;
   const unknown = statuses.filter(

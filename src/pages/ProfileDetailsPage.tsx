@@ -3,12 +3,15 @@ import { useLoaderData, Link } from "react-router";
 import { useState } from "react";
 import { Check, Copy, ArrowRight } from "lucide-react";
 import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
-import { DetailedProofCard } from "@/components/Profile/DetailedProofCard";
+import { DetailedClaimCard } from "@/components/Profile/DetailedClaimCard";
 import { KeyCard } from "@/components/Profile/KeyCard";
 import { NotFoundContent } from "./NotFoundPage";
 import { getProfile } from "@/lib/bsky";
-import { listProofs, listKeys, type AtProtoRecord } from "@/lib/atproto";
-import type { MeAttestProof, MeAttestKey } from "../../types/lexicons";
+import { listClaims, listKeys, type AtProtoRecord } from "@/lib/atproto";
+import type {
+  DevKeytraceClaim,
+  DevKeytraceUserPublicKey,
+} from "../../types/keytrace";
 
 interface ProfileDetailsData {
   handle: string;
@@ -17,8 +20,8 @@ interface ProfileDetailsData {
   description?: string;
   avatar?: string;
   isValid: boolean;
-  proofs: AtProtoRecord<MeAttestProof.Main>[];
-  keys: AtProtoRecord<MeAttestKey.Main>[];
+  claims: AtProtoRecord<DevKeytraceClaim.Main>[];
+  keys: AtProtoRecord<DevKeytraceUserPublicKey.Main>[];
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -28,7 +31,7 @@ export async function profileDetailsLoader({
   const handle = params.handle;
 
   if (!handle) {
-    return { handle: "", did: "", isValid: false, proofs: [], keys: [] };
+    return { handle: "", did: "", isValid: false, claims: [], keys: [] };
   }
 
   const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
@@ -40,13 +43,13 @@ export async function profileDetailsLoader({
         handle: cleanHandle,
         did: "",
         isValid: false,
-        proofs: [],
+        claims: [],
         keys: [],
       };
     }
 
-    const [proofs, keys] = await Promise.all([
-      listProofs(profile.did).catch(() => []),
+    const [claims, keys] = await Promise.all([
+      listClaims(profile.did).catch(() => []),
       listKeys(profile.did).catch(() => []),
     ]);
 
@@ -57,7 +60,7 @@ export async function profileDetailsLoader({
       description: profile.description,
       avatar: profile.avatar,
       isValid: true,
-      proofs,
+      claims,
       keys,
     };
   } catch (error) {
@@ -66,7 +69,7 @@ export async function profileDetailsLoader({
       handle: cleanHandle,
       did: "",
       isValid: false,
-      proofs: [],
+      claims: [],
       keys: [],
     };
   }
@@ -74,14 +77,14 @@ export async function profileDetailsLoader({
 
 export function ProfileDetailsPage() {
   const profile = useLoaderData() as ProfileDetailsData;
-  const [activeTab, setActiveTab] = useState<"proofs" | "keys">("proofs");
+  const [activeTab, setActiveTab] = useState<"claims" | "keys">("claims");
   const [copiedDid, setCopiedDid] = useState(false);
 
   if (!profile.isValid) {
     return <NotFoundContent />;
   }
 
-  const activeProofs = profile.proofs.filter(
+  const activeClaims = profile.claims.filter(
     (p) => p.value.status !== "retracted",
   );
   const copyDid = async () => {
@@ -153,16 +156,16 @@ export function ProfileDetailsPage() {
       >
         <button
           role="tab"
-          aria-selected={activeTab === "proofs"}
-          aria-controls="tab-panel-proofs"
-          onClick={() => setActiveTab("proofs")}
+          aria-selected={activeTab === "claims"}
+          aria-controls="tab-panel-claims"
+          onClick={() => setActiveTab("claims")}
           className={`flex-1 py-3 text-sm font-semibold border-b-3 -mb-0.5 transition-colors cursor-pointer bg-transparent ${
-            activeTab === "proofs"
+            activeTab === "claims"
               ? "text-accent border-accent"
               : "text-muted border-transparent hover:text-inherit"
           }`}
         >
-          Proofs ({activeProofs.length})
+          Claims ({activeClaims.length})
         </button>
         <button
           role="tab"
@@ -180,21 +183,21 @@ export function ProfileDetailsPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "proofs" && (
+      {activeTab === "claims" && (
         <div
-          id="tab-panel-proofs"
+          id="tab-panel-claims"
           role="tabpanel"
           className="flex flex-col gap-4"
         >
-          {activeProofs.length > 0 ? (
-            activeProofs.map((proof) => (
-              <DetailedProofCard key={proof.uri} proof={proof} />
+          {activeClaims.length > 0 ? (
+            activeClaims.map((claim) => (
+              <DetailedClaimCard key={claim.uri} claim={claim} />
             ))
           ) : (
             <div className="text-center py-12 text-muted">
-              <p className="text-lg mb-1">No proofs found</p>
+              <p className="text-lg mb-1">No claims found</p>
               <p className="text-sm">
-                This user hasn&apos;t published any identity proofs yet.
+                This user hasn&apos;t published any identity claims yet.
               </p>
             </div>
           )}

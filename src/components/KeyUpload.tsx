@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { Upload, Key, AlertCircle, FileUp, Loader2 } from "lucide-react";
 import { parseKey, type ParsedKey } from "@/lib/key-parser";
 import { publishKey } from "@/lib/atproto";
-import { LEXICON_NS } from "@/lib/constants";
+import { ids } from "../../types/keytrace";
 import { KEY_TYPE_LABELS } from "@/lib/global-features";
 
 interface KeyUploadProps {
@@ -42,14 +42,13 @@ export function KeyUpload({ onSuccess }: KeyUploadProps) {
 
     try {
       const { uri, cid } = await publishKey({
-        $type: `${LEXICON_NS}.key`,
+        $type: ids.DevKeytraceUserPublicKey,
         keyType: parsed.keyType,
         fingerprint: parsed.fingerprint,
-        publicKey: parsed.publicKey,
+        publicKeyArmored: parsed.publicKeyArmored,
         label: label || undefined,
         comment: parsed.comment,
         expiresAt: parsed.expiresAt,
-        status: "active",
         createdAt: new Date().toISOString(),
       });
       onSuccess(uri, cid);

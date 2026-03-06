@@ -19,7 +19,6 @@
     "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
     "update-oauth-url": "tsx scripts/update-oauth-url.ts",
-    "generate:types": "lex-cli generate",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
@@ -35,6 +34,8 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/express": "^4.0.4",
     "@fastify/static": "^9.0.0",
+    "@keytrace/lexicon": "0.0.11",
+    "@keytrace/runner": "0.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
@@ -52,7 +53,6 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@atcute/lex-cli": "^2.5.3",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^24.10.1",

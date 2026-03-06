@@ -61,7 +61,7 @@ export async function render(request: Request) {
           handle?: string;
           displayName?: string;
           description?: string;
-          proofs?: unknown[];
+          claims?: unknown[];
           keys?: unknown[];
           isValid?: boolean;
         }
@@ -69,15 +69,15 @@ export async function render(request: Request) {
 
     if (data?.isValid && data.handle) {
       const name = data.displayName || `@${data.handle}`;
-      const proofCount = data.proofs?.length ?? 0;
+      const claimCount = data.claims?.length ?? 0;
       const keyCount = data.keys?.length ?? 0;
 
       metaTitle = `${name} (@${data.handle}) — ATtestfor.me`;
 
       if (data.description) {
-        metaDescription = `${data.description} · ${proofCount} verified account${proofCount !== 1 ? "s" : ""} on ATtestfor.me.`;
+        metaDescription = `${data.description} · ${claimCount} verified account${claimCount !== 1 ? "s" : ""} on ATtestfor.me.`;
       } else {
-        metaDescription = `${name} has ${proofCount} linked account${proofCount !== 1 ? "s" : ""} and ${keyCount} public key${keyCount !== 1 ? "s" : ""} on ATtestfor.me.`;
+        metaDescription = `${name} has ${claimCount} linked account${claimCount !== 1 ? "s" : ""} and ${keyCount} public key${keyCount !== 1 ? "s" : ""} on ATtestfor.me.`;
       }
       break;
     }

@@ -48,7 +48,7 @@ describe("key-parser", () => {
 
       expect(result.keyType).toBe("ssh-ed25519");
       expect(result.fingerprint).toMatch(/^SHA256:/);
-      expect(result.publicKey).toBe(sshKey);
+      expect(result.publicKeyArmored).toBe(sshKey);
       expect(result.comment).toBe("user@host");
       expect(result.algorithm).toBe("ssh-ed25519");
       expect(mockDigest).toHaveBeenCalledWith(
@@ -119,7 +119,7 @@ describe("key-parser", () => {
       expect(result.comment).toBe("Test User");
       expect(result.expiresAt).toBe("2030-01-01T00:00:00.000Z");
       expect(result.algorithm).toBe("eddsa");
-      expect(result.publicKey).toBe(armoredKey.trim());
+      expect(result.publicKeyArmored).toBe(armoredKey.trim());
     });
 
     it("handles keys without expiration", async () => {
