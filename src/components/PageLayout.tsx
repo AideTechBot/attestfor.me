@@ -24,7 +24,6 @@ import { useSessionHint } from "@/lib/session-hint";
 import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
 import { thumbnailAvatar } from "@/lib/bsky";
-import { VerificationProvider } from "@/lib/verification-context";
 import { SEARCH, NAV, AUTH, MISC } from "@/lib/ui-strings";
 import "./search-animated.css";
 
@@ -424,7 +423,7 @@ export function PageLayout({ children }: PageLayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col border border-surface-border p-6">
-        <VerificationProvider>{children ?? <Outlet />}</VerificationProvider>
+        {children ?? <Outlet />}
       </main>
 
       {/* Footer */}

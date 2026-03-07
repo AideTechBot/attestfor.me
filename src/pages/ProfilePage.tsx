@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link } from "react-router";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { AvatarWithShimmer } from "@/components/AvatarWithShimmer";
 import { SimpleClaimCard } from "@/components/Profile/SimpleClaimCard";
 import { NotFoundContent } from "./NotFoundPage";
@@ -12,8 +12,11 @@ import type {
 } from "../../types/keytrace";
 import { Share2, Check } from "lucide-react";
 import { getClaimStatusLabel } from "@/lib/claim-status-label";
-import { useVerificationStatuses } from "@/lib/verification-context";
-import { SUPPORTED_SERVICES } from "@/lib/run-verification";
+import {
+  useVerificationStatuses,
+  useVerificationDispatch,
+} from "@/lib/verification-context";
+import { SUPPORTED_SERVICES, runVerification } from "@/lib/run-verification";
 import { PROFILE, PROFILE_EMPTY, NAV } from "@/lib/ui-strings";
 
 interface ProfileData {
@@ -108,10 +111,36 @@ export function ProfilePage() {
     : [];
 
   const [copied, setCopied] = useState(false);
+  const [verifyingAll, setVerifyingAll] = useState(false);
+  const verifyingAllRef = useRef(false);
+
+  const dispatch = useVerificationDispatch();
 
   // Read statuses for the summary label — each SimpleClaimCard manages its
   // own verification, we just need the statuses for getClaimStatusLabel.
   const claimStatuses = useVerificationStatuses(activeClaims.map((p) => p.uri));
+
+  const handleVerifyAll = useCallback(async () => {
+    if (verifyingAllRef.current) {
+      return;
+    }
+    verifyingAllRef.current = true;
+    setVerifyingAll(true);
+    try {
+      for (const claim of activeClaims) {
+        // Only verify claims that haven't been attempted yet
+        const idx = activeClaims.indexOf(claim);
+        const status = claimStatuses[idx];
+        if (status !== "idle") {
+          continue;
+        }
+        await runVerification(claim, dispatch);
+      }
+    } finally {
+      verifyingAllRef.current = false;
+      setVerifyingAll(false);
+    }
+  }, [activeClaims, claimStatuses, dispatch]);
 
   if (!profile.isValid) {
     return <NotFoundContent />;
@@ -178,11 +207,15 @@ export function ProfilePage() {
             }[colour];
             return (
               <div className="flex items-stretch gap-3 w-full min-w-0">
-                <div
-                  className={`flex-1 min-w-0 flex items-center justify-center px-4 py-2 border text-sm font-semibold ${cls}`}
+                <button
+                  onClick={handleVerifyAll}
+                  disabled={verifyingAll}
+                  title={PROFILE.verifyAll}
+                  aria-label={PROFILE.verifyAll}
+                  className={`flex-1 min-w-0 flex items-center justify-center px-4 py-2 border text-sm font-semibold bg-transparent cursor-pointer hover:brightness-125 transition-all disabled:cursor-default disabled:opacity-70 ${cls}`}
                 >
                   {label}
-                </div>
+                </button>
                 <div className="relative shrink-0 flex">
                   <button
                     onClick={handleShare}

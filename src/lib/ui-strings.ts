@@ -80,6 +80,7 @@ export const AUTH_ERRORS = {
 
 export const PROFILE = {
   shareProfile: "Share profile",
+  verifyAll: "Click to verify all accounts",
   copyDid: "Copy DID",
   copyDidToClipboard: "Copy DID to clipboard",
   copied: "Copied!",
@@ -119,7 +120,8 @@ export const CLAIMS = {
 
 export const CLAIM_WIZARD = {
   selectService: "Add claim: Select service",
-  selectServiceDesc: "Choose the service you want to link to your AT Protocol identity.",
+  selectServiceDesc:
+    "Choose the service you want to link to your AT Protocol identity.",
   enterDomain: "Enter the domain you want to verify.",
   dnsInstruction: (domain: string) =>
     `Add a TXT record at _keytrace.${domain} with the following value:`,
@@ -132,7 +134,8 @@ export const CLAIM_WIZARD = {
   copy: "Copy",
   claimVerified: "Claim verified successfully",
   addToList: "Add to list",
-  saveNote: "This proof will be saved to your repo when you click Save changes.",
+  saveNote:
+    "This proof will be saved to your repo when you click Save changes.",
   service: "Service:",
   handle: "Handle:",
   claimUri: "Claim URI:",
@@ -141,7 +144,9 @@ export const CLAIM_WIZARD = {
     const titles: Record<string, string> = {
       "select-service": "Add claim: Select service",
       "enter-handle": `Add claim: ${service ?? ""}`,
-      "show-challenge": isDns ? "Add claim: Add DNS record" : "Add claim: Post challenge",
+      "show-challenge": isDns
+        ? "Add claim: Add DNS record"
+        : "Add claim: Post challenge",
       verify: "Add claim: Verify",
       done: "Add claim: Verified",
     };
@@ -179,8 +184,10 @@ export const VERIFY_ERRORS = {
   noExpectedFile: (paths: string) =>
     `No expected file found. Please name your file one of: ${paths}`,
   noContentAtLocation: "No proof content was found at the expected location.",
-  didNotFound: "DID not found in claim content. Make sure the proof text matches exactly.",
-  noTxtRecord: (domain: string) => `No matching TXT record found at _keytrace.${domain}`,
+  didNotFound:
+    "DID not found in claim content. Make sure the proof text matches exactly.",
+  noTxtRecord: (domain: string) =>
+    `No matching TXT record found at _keytrace.${domain}`,
   handleMismatch: (expected: string, actual: string) =>
     `Handle mismatch: expected "${expected}", got "${actual}"`,
 } as const;
@@ -215,7 +222,8 @@ export const KEYS = {
 export const KEY_WIZARD = {
   pasteOrUpload: "Add key: Paste or upload",
   verified: "Add key: Verified",
-  instruction: "Paste a PGP or SSH public key. It will be validated before adding.",
+  instruction:
+    "Paste a PGP or SSH public key. It will be validated before adding.",
   placeholder: "Paste your public key here (PGP, SSH Ed25519, or SSH ECDSA)...",
   uploadFile: "Upload .pub / .asc file",
   labelAriaLabel: "Key label (optional)",
@@ -353,5 +361,6 @@ export const MISC = {
 // ============================================================================
 
 export const META = {
-  profileTitle: (name: string, handle: string) => `${name} (@${handle}) | ATtestfor.me`,
+  profileTitle: (name: string, handle: string) =>
+    `${name} (@${handle}) | ATtestfor.me`,
 } as const;

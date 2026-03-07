@@ -2,7 +2,6 @@ import { Link, Outlet } from "react-router";
 import { Toaster } from "sonner";
 import { useState, useEffect } from "react";
 import { OfflineIndicator } from "./OfflineIndicator";
-import { VerificationProvider } from "@/lib/verification-context";
 import { FOOTER_LINKS } from "./PageLayout";
 
 export function SimplePageLayout() {
@@ -17,9 +16,7 @@ export function SimplePageLayout() {
     <div className="w-full max-w-[400px] min-w-[400px] min-h-screen mx-auto px-2 py-8 flex flex-col">
       {/* Main Content — no header, no border */}
       <main className="flex-1 flex flex-col p-6">
-        <VerificationProvider>
-          <Outlet />
-        </VerificationProvider>
+        <Outlet />
       </main>
 
       {/* Footer */}

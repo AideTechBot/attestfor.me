@@ -121,3 +121,15 @@ export function useVerificationStatuses(uris: string[]): VerifyStatus[] {
   }
   return uris.map((uri) => ctx.store[uri]?.status ?? "idle");
 }
+
+/** Access the verification dispatch function without being tied to a specific URI. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useVerificationDispatch(): React.Dispatch<VerificationAction> {
+  const ctx = useContext(VerificationContext);
+  if (!ctx) {
+    throw new Error(
+      "useVerificationDispatch must be used within a VerificationProvider",
+    );
+  }
+  return ctx.dispatch;
+}
