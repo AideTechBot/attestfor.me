@@ -82,7 +82,9 @@ export function PageLayout({ children }: PageLayoutProps) {
   const location = useLocation();
 
   const isHomePage = location.pathname === "/" || location.pathname === "/home";
-  const isOwnProfile = location.pathname === `/@${session.handle}/details`;
+  const isOwnProfile =
+    location.pathname === `/@${session.handle}` ||
+    location.pathname === `/@${session.handle}/details`;
 
   // Check if user likely has a session (set via cookie, available during SSR)
   const maybeAuthenticated = useSessionHint();
