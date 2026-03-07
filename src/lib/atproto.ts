@@ -4,8 +4,61 @@
  * and the user's PDS for writes (via OAuth session).
  */
 
-const DEFAULT_PDS = "https://bsky.social";
+const FALLBACK_PDS = "https://bsky.social";
+const PLC_DIRECTORY = "https://plc.directory";
 const DEFAULT_LIST_LIMIT = 100;
+
+// ── PDS resolution ─────────────────────────────────────────────────
+
+/**
+ * Simple in-memory cache for DID -> PDS endpoint mappings.
+ * Avoids repeated DID document lookups for the same user.
+ */
+const pdsCache = new Map<string, { pds: string; expiresAt: number }>();
+const PDS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Resolve the PDS endpoint for a given DID by fetching its DID document.
+ * Supports did:plc (via plc.directory) and did:web (via .well-known).
+ * Falls back to bsky.social if resolution fails.
+ */
+export async function resolvePds(did: string): Promise<string> {
+  // Check cache first
+  const cached = pdsCache.get(did);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.pds;
+  }
+
+  try {
+    let url: string;
+    if (did.startsWith("did:plc:")) {
+      url = `${PLC_DIRECTORY}/${did}`;
+    } else if (did.startsWith("did:web:")) {
+      const host = did.slice("did:web:".length).replace(/%3A/g, ":");
+      url = `https://${host}/.well-known/did.json`;
+    } else {
+      return FALLBACK_PDS;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      return FALLBACK_PDS;
+    }
+
+    const doc = await res.json();
+    const pdsService = (doc.service ?? []).find(
+      (s: { id: string; type: string }) =>
+        s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer",
+    );
+
+    const pds = pdsService?.serviceEndpoint ?? FALLBACK_PDS;
+
+    pdsCache.set(did, { pds, expiresAt: Date.now() + PDS_CACHE_TTL_MS });
+    return pds;
+  } catch {
+    return FALLBACK_PDS;
+  }
+}
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -55,7 +108,8 @@ export async function getRecord<T = Record<string, unknown>>(
   collection: string,
   rkey: string,
 ): Promise<AtProtoRecord<T>> {
-  const url = xrpcUrl(DEFAULT_PDS, "com.atproto.repo.getRecord", {
+  const pds = await resolvePds(repo);
+  const url = xrpcUrl(pds, "com.atproto.repo.getRecord", {
     repo,
     collection,
     rkey,
@@ -88,7 +142,8 @@ export async function listRecords<T = Record<string, unknown>>(
     params.cursor = cursor;
   }
 
-  const url = xrpcUrl(DEFAULT_PDS, "com.atproto.repo.listRecords", params);
+  const pds = await resolvePds(repo);
+  const url = xrpcUrl(pds, "com.atproto.repo.listRecords", params);
 
   const response = await fetch(url);
   if (!response.ok) {
