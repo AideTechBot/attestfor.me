@@ -1,9 +1,9 @@
 {
-  "client_id": "https://fr2mvbkr-3000.use.devtunnels.ms/oauth/client-metadata.json",
+  "client_id": "https://attestfor.me/oauth/client-metadata.json",
   "client_name": "ATtestfor.me",
-  "client_uri": "https://fr2mvbkr-3000.use.devtunnels.ms",
+  "client_uri": "https://attestfor.me",
   "redirect_uris": [
-    "https://fr2mvbkr-3000.use.devtunnels.ms/api/auth/callback"
+    "https://attestfor.me/api/auth/callback"
   ],
   "scope": "atproto transition:generic",
   "grant_types": [
