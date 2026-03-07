@@ -22,7 +22,7 @@
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint"
+    "pre-commit": "pnpm lint && ! grep -q devtunnels public/oauth/client-metadata.json || (echo 'Error: dev tunnel URL in client-metadata.json' && exit 1)"
   },
   "pnpm": {
     "patchedDependencies": {
