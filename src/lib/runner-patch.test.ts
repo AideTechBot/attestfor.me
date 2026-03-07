@@ -2,7 +2,7 @@
  * Tests that the @keytrace/runner patch correctly threads a custom `fetch`
  * function through `verifyClaim` → fetchers instead of using `globalThis.fetch`.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createClaim, verifyClaim, ClaimStatus } from "@keytrace/runner";
 
 // A fake DID that passes the runner's did:plc validation (24 base32 chars)

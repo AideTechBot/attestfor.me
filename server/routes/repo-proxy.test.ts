@@ -3,9 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the oauth module before importing
 vi.mock("../oauth", () => ({
-  oauthClient: {
-    restore: vi.fn(),
-  },
+  restoreSession: vi.fn(),
   getSession: vi.fn(),
 }));
 
@@ -17,7 +15,7 @@ vi.mock("@atcute/client", () => ({
   }),
 }));
 
-import { oauthClient, getSession } from "../oauth";
+import { restoreSession, getSession } from "../oauth";
 
 // Minimal Fastify-like test harness
 function createMockReqRes(options: {
@@ -139,7 +137,7 @@ describe("repo-proxy", () => {
         },
       });
       (getSession as any).mockResolvedValueOnce({ did: "did:plc:test" });
-      (oauthClient.restore as any).mockResolvedValueOnce({});
+      (restoreSession as any).mockResolvedValueOnce({});
 
       const record = {
         keyType: "pgp",
@@ -157,7 +155,7 @@ describe("repo-proxy", () => {
 
       await createRecordHandler(req, res);
 
-      expect(oauthClient.restore).toHaveBeenCalledWith("did:plc:test");
+      expect(restoreSession).toHaveBeenCalledWith("did:plc:test");
       expect(mockPost).toHaveBeenCalledWith("com.atproto.repo.createRecord", {
         input: {
           repo: "did:plc:test",
@@ -174,9 +172,7 @@ describe("repo-proxy", () => {
 
     it("returns 500 on PDS failure", async () => {
       (getSession as any).mockResolvedValueOnce({ did: "did:plc:test" });
-      (oauthClient.restore as any).mockRejectedValueOnce(
-        new Error("Token expired"),
-      );
+      (restoreSession as any).mockRejectedValueOnce(new Error("Token expired"));
 
       const { req, res, getStatus, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
@@ -254,7 +250,7 @@ describe("repo-proxy", () => {
     it("proxies deleteRecord with correct params", async () => {
       mockPost.mockResolvedValueOnce({});
       (getSession as any).mockResolvedValueOnce({ did: "did:plc:test" });
-      (oauthClient.restore as any).mockResolvedValueOnce({});
+      (restoreSession as any).mockResolvedValueOnce({});
 
       const { req, res, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },
@@ -263,7 +259,7 @@ describe("repo-proxy", () => {
 
       await deleteRecordHandler(req, res);
 
-      expect(oauthClient.restore).toHaveBeenCalledWith("did:plc:test");
+      expect(restoreSession).toHaveBeenCalledWith("did:plc:test");
       expect(mockPost).toHaveBeenCalledWith("com.atproto.repo.deleteRecord", {
         input: {
           repo: "did:plc:test",
@@ -277,7 +273,7 @@ describe("repo-proxy", () => {
     it("returns 500 on PDS failure", async () => {
       mockPost.mockRejectedValueOnce(new Error("Record not found"));
       (getSession as any).mockResolvedValueOnce({ did: "did:plc:test" });
-      (oauthClient.restore as any).mockResolvedValueOnce({});
+      (restoreSession as any).mockResolvedValueOnce({});
 
       const { req, res, getStatus, getBody } = createMockReqRes({
         cookies: { session: "valid-id" },

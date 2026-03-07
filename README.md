@@ -1,33 +1,105 @@
-# ATtestfor.me
+# attestfor.me
 
-Todo description
+A decentralized identity verification service built on AT Protocol. Link and verify your social accounts (GitHub, Twitter/X, Mastodon, etc.), domains, and cryptographic keys to your Bluesky identity. It aims to be a "Linktree-like" experience with verification that the links you click verified to be owned by the user.
 
-## Deploy
+## Features
 
-Point your domain's DNS to your server, then:
+- **Identity Claims** - Verify ownership of social accounts by posting a cryptographic proof
+- **DNS Verification** - Prove domain ownership via TXT records
+- **PGP Keys** - Associate OpenPGP public keys with your identity
+- **Key Retraction** - Permanently mark compromised keys as retracted
+- **Real-time Verification** - Some claims are verified client-side using [@keytrace/runner](https://npmx.dev/package/@keytrace/runner)
+- **Supports keytrace.dev lexicon** - Uses the same lexicon as [@keytrace/lexicon](https://npmx.dev/package/@keytrace/lexicon) so the services are 100% compatible.
+
+## Supported Services
+
+- GitHub (gists)
+- Twitter/X
+- Mastodon/ActivityPub
+- Bluesky
+- DNS domains
+- OpenPGP keys
+
+## Development
+
+### Prerequisites
+
+- Node.js 24+
+- pnpm
+
+### Dev Setup
+
+```bash
+pnpm install
+cp .env.example .env
+```
+
+The app runs at `http://localhost:3000`. For OAuth to work, you need a publicly accessible URL (VS Code dev tunnels, ngrok, etc.).
+
+**Before starting the dev server**, run the URL update script with your tunnel URL:
+
+```bash
+pnpm update-oauth-url https://your-tunnel.devtunnels.ms
+pnpm dev
+```
+
+This updates both `.env` and `public/oauth/client-metadata.json` with your tunnel URL so OAuth redirects work correctly. Run this again whenever your tunnel URL changes.
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development server with hot reload |
+| `pnpm build` | Build for production |
+| `pnpm start` | Run production build |
+| `pnpm test` | Run tests |
+| `pnpm lint` | Lint code |
+| `pnpm update-oauth-url <url>` | Update OAuth config for dev tunnels |
+
+### Project Structure
+
+```
+├── server/           # Fastify backend
+│   ├── routes/       # API endpoints (OAuth, repo proxy, DNS lookup)
+│   ├── oauth.ts      # AT Protocol OAuth client
+│   └── storage.ts    # Redis/in-memory session storage
+├── src/
+│   ├── components/   # React components
+│   ├── lib/          # Utilities (verification, key parsing)
+│   └── pages/        # Page components
+├── types/            # TypeScript types (keytrace lexicons)
+└── public/           # Static assets (OAuth client metadata)
+```
+
+## Deployment
+
+### Quick Deploy
+
+To deploy this to a server with all services included (redis, caddy, etc.), point your domain's DNS to your server. Then, on the server, run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AideTechBot/attestfor.me/main/scripts/deploy.sh | bash -s -- your-domain.com
 ```
 
-This pulls the latest Docker image, sets up Caddy for automatic HTTPS, and starts everything. To update later:
+### Manual Deploy
+
+A manual deploy is a bit more complicated, there are many ways to do this. Figure it out.
+
+### Update
+
+This pulls the latest image and restarts everything:
 
 ```bash
 cd ~/attestfor.me && docker compose pull && docker compose up -d
 ```
 
-To blow everything away from the server do:
+## Architecture
 
-```bash
-cd ~/attestfor.me && docker compose down && cd ~ && rm -rf ~/attestfor.me
-```
+- **Frontend**: React 19 with React Router, TanStack Query, Tailwind CSS
+- **Backend**: Fastify with AT Protocol OAuth
+- **Verification**: Client-side using @keytrace/runner, with server proxy for CORS
+- **Storage**: Redis in production, in-memory for development
 
-## Development
+## License
 
-### Dependencies
-
-We use pnpm and node 24.
-
-### Notice
-
-I know this uses a lot of Bluesky APIs. This is intentional, so I don't have to cache as much and stuff loads faster. If someone can show me how to not do that and use ATproto stuff where I don't have to cache images and use a lot of memory on the server-side, I would be forever grateful.
+MIT

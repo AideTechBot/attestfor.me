@@ -16,8 +16,6 @@ export default defineConfig({
         "server/oauth.ts",
         "server/storage.ts",
         "server/cache-ttl.ts",
-        "server/routes/keys.ts",
-        "server/atproto-repo.ts",
       ],
       thresholds: {
         branches: 80,
