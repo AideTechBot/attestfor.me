@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@keytrace/runner':
-    hash: 83567f68f5bf258ee92c9a5ee64650693ea0df0a8f5cd4eaacde2041732a1b32
+    hash: 9f22183d205cd4eba1d3ec61d7f305003ea329f00e75bc381768aea6eaa6243b
     path: patches/@keytrace__runner.patch
 
 importers:
@@ -45,7 +45,7 @@ importers:
         version: 0.0.11
       '@keytrace/runner':
         specifier: 0.1.1
-        version: 0.1.1(patch_hash=83567f68f5bf258ee92c9a5ee64650693ea0df0a8f5cd4eaacde2041732a1b32)
+        version: 0.1.1(patch_hash=9f22183d205cd4eba1d3ec61d7f305003ea329f00e75bc381768aea6eaa6243b)
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.16
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -3085,7 +3085,7 @@ snapshots:
 
   '@keytrace/lexicon@0.0.11': {}
 
-  '@keytrace/runner@0.1.1(patch_hash=83567f68f5bf258ee92c9a5ee64650693ea0df0a8f5cd4eaacde2041732a1b32)':
+  '@keytrace/runner@0.1.1(patch_hash=9f22183d205cd4eba1d3ec61d7f305003ea329f00e75bc381768aea6eaa6243b)':
     dependencies:
       '@atproto/api': 0.14.22
       cheerio: 1.2.0

@@ -24,6 +24,11 @@
   "simple-git-hooks": {
     "pre-commit": "pnpm lint"
   },
+  "pnpm": {
+    "patchedDependencies": {
+      "@keytrace/runner": "patches/@keytrace__runner.patch"
+    }
+  },
   "dependencies": {
     "@atcute/atproto": "^3.1.10",
     "@atcute/client": "^4.2.1",
