@@ -13,6 +13,7 @@ import type {
 import { Share2, Check } from "lucide-react";
 import { getClaimStatusLabel } from "@/lib/claim-status-label";
 import { useVerificationStatuses } from "@/lib/verification-context";
+import { SUPPORTED_SERVICES } from "@/lib/run-verification";
 import { PROFILE, PROFILE_EMPTY, NAV } from "@/lib/ui-strings";
 
 interface ProfileData {
@@ -101,7 +102,9 @@ export function ProfilePage() {
   const profile = useLoaderData() as ProfileData;
 
   const activeClaims = profile.isValid
-    ? profile.claims.filter((p) => !p.value.retractedAt)
+    ? profile.claims.filter(
+        (p) => !p.value.retractedAt && SUPPORTED_SERVICES.has(p.value.type),
+      )
     : [];
 
   const [copied, setCopied] = useState(false);

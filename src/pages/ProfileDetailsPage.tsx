@@ -13,6 +13,7 @@ import type {
   DevKeytraceUserPublicKey,
 } from "../../types/keytrace";
 import { NAV, PROFILE, PROFILE_EMPTY } from "@/lib/ui-strings";
+import { SUPPORTED_SERVICES } from "@/lib/run-verification";
 
 interface ProfileDetailsData {
   handle: string;
@@ -86,7 +87,8 @@ export function ProfileDetailsPage() {
   }
 
   const activeClaims = profile.claims.filter(
-    (p) => p.value.status !== "retracted",
+    (p) =>
+      p.value.status !== "retracted" && SUPPORTED_SERVICES.has(p.value.type),
   );
   const copyDid = async () => {
     await navigator.clipboard.writeText(profile.did);
