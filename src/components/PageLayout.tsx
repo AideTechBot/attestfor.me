@@ -83,8 +83,8 @@ export function PageLayout({ children }: PageLayoutProps) {
 
   const isHomePage = location.pathname === "/" || location.pathname === "/home";
   const isOwnProfile =
-    location.pathname === `/@${session.handle}` ||
-    location.pathname === `/@${session.handle}/details`;
+    location.pathname === `/${session.handle}` ||
+    location.pathname === `/${session.handle}/details`;
 
   // Check if user likely has a session (set via cookie, available during SSR)
   const maybeAuthenticated = useSessionHint();
@@ -185,7 +185,7 @@ export function PageLayout({ children }: PageLayoutProps) {
       : searchValue;
     addRecentSearch(clean);
     setRecentSearches(getRecentSearches());
-    navigate(`/@${clean}/details`);
+    navigate(`/${clean}/details`);
     setSearchValue("");
     inputRef.current?.blur();
   };
@@ -193,7 +193,7 @@ export function PageLayout({ children }: PageLayoutProps) {
   const handleSearchSelect = (handle: string) => {
     addRecentSearch(handle);
     setRecentSearches(getRecentSearches());
-    navigate(`/@${handle}/details`);
+    navigate(`/${handle}/details`);
     setSearchValue("");
     inputRef.current?.blur();
   };
@@ -397,7 +397,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                   {!isOwnProfile && (
                     <DropdownMenuItem
                       className={cn("whitespace-nowrap", MENU_ITEM_CLASS)}
-                      onSelect={() => navigate(`/@${session.handle}/details`)}
+                      onSelect={() => navigate(`/${session.handle}/details`)}
                     >
                       <span>{NAV.visitProfile}</span>
                       <ExternalLink className="w-4 h-4 ml-auto" />

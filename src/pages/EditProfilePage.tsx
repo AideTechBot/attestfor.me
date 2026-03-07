@@ -269,7 +269,7 @@ export function EditProfilePage() {
     <div className="flex flex-col gap-4 max-w-xl mx-auto w-full">
       {/* Back link */}
       <Link
-        to={`/@${session.handle}/details`}
+        to={`/${session.handle}/details`}
         className="-mx-6 -mt-6 flex items-center mb-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold text-sm transition-colors no-underline"
       >
         <ArrowLeft className="w-3.5 h-3.5" /> {NAV.backToProfile}

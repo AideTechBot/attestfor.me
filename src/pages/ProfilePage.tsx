@@ -36,7 +36,7 @@ export async function profileLoader({
     return { handle: "", did: "", isValid: false, claims: [], keys: [] };
   }
 
-  // Remove @ prefix if present (handle comes from URL like /@manoo.dev)
+  // Remove @ prefix if present (in case user types @handle in URL)
   const cleanHandle = handle.startsWith("@") ? handle.slice(1) : handle;
 
   // Skip requests for static files that hit the /:handle route (e.g. favicon.ico)
