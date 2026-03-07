@@ -7,6 +7,7 @@ import { StatusBadge } from "./StatusBadge";
 import { useVerification, type VerifyStatus } from "@/lib/verification-context";
 import { runVerification } from "@/lib/run-verification";
 import { serviceProviders } from "@keytrace/runner";
+import { CLAIM_WARNING, NAV } from "@/lib/ui-strings";
 
 interface SimpleClaimCardProps {
   claim: AtProtoRecord<DevKeytraceClaim.Main>;
@@ -71,24 +72,24 @@ export function SimpleClaimCard({ claim }: SimpleClaimCardProps) {
     }
 
     if (verifyStatus === "verified") {
-      // Already verified — navigate normally
+      // Already verified - navigate normally
       return;
     }
 
     if (verifyStatus === "failed") {
-      // Already failed — show warning instead of navigating
+      // Already failed - show warning instead of navigating
       e.preventDefault();
       setShowWarning(true);
       return;
     }
 
     if (verifyStatus === "loading") {
-      // In-progress — block navigation
+      // In-progress - block navigation
       e.preventDefault();
       return;
     }
 
-    // idle — kick off verification before navigating
+    // idle - kick off verification before navigating
     e.preventDefault();
     clickedCardRef.current = true;
     handleVerify();
@@ -173,12 +174,8 @@ export function SimpleClaimCard({ claim }: SimpleClaimCardProps) {
       >
         <div className="bg-red-950/60 border border-red-500/40 border-t-0 px-4 py-3 flex flex-col gap-3">
           <p className="text-sm text-red-200 leading-snug">
-            <span className="font-semibold text-red-100">Heads up —</span> this{" "}
-            {serviceName} account could not be verified as owned by{" "}
-            <span className="font-semibold text-red-100">
-              {value.identity.subject}
-            </span>
-            . Are you sure you want to continue to {serviceName}?
+            <span className="font-semibold text-red-100">{CLAIM_WARNING.headsUp}</span>{" "}
+            {CLAIM_WARNING.message(serviceName, value.identity.subject)}
           </p>
           <div className="flex gap-2">
             <a
@@ -188,13 +185,13 @@ export function SimpleClaimCard({ claim }: SimpleClaimCardProps) {
               className="px-3 py-1.5 text-xs font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 transition-colors no-underline"
               onClick={() => setShowWarning(false)}
             >
-              Go anyway
+              {NAV.goAnyway}
             </a>
             <button
               onClick={() => setShowWarning(false)}
               className="px-3 py-1.5 text-xs font-semibold text-muted hover:text-white border border-surface-border hover:border-white/20 transition-colors"
             >
-              Dismiss
+              {NAV.dismiss}
             </button>
           </div>
         </div>

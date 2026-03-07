@@ -12,6 +12,7 @@ import type {
   DevKeytraceClaim,
   DevKeytraceUserPublicKey,
 } from "../../types/keytrace";
+import { NAV, PROFILE, PROFILE_EMPTY } from "@/lib/ui-strings";
 
 interface ProfileDetailsData {
   handle: string;
@@ -100,7 +101,7 @@ export function ProfileDetailsPage() {
         to={`/${profile.handle}`}
         className="-mx-6 -mt-6 flex items-center justify-end mb-6 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold text-sm transition-colors no-underline"
       >
-        Simple view <ArrowRight className="w-3.5 h-3.5 inline" />
+        {NAV.simpleView} <ArrowRight className="w-3.5 h-3.5 inline" />
       </Link>
 
       {/* Profile Header — centred, matching ProfilePage */}
@@ -131,8 +132,8 @@ export function ProfileDetailsPage() {
         {/* DID — monospace tag, click to copy */}
         <button
           onClick={copyDid}
-          title="Copy DID"
-          aria-label="Copy DID to clipboard"
+          title={PROFILE.copyDid}
+          aria-label={PROFILE.copyDidToClipboard}
           className="inline-flex items-center gap-2 mt-[-8px] bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/35 transition-colors px-2.5 py-1 max-w-full cursor-pointer"
         >
           <span className="font-mono text-xs text-white/70 break-all leading-none">
@@ -151,7 +152,7 @@ export function ProfileDetailsPage() {
       {/* Tabs */}
       <div
         role="tablist"
-        aria-label="Profile sections"
+        aria-label={PROFILE.profileSections}
         className="flex mb-6 border-b-2 border-surface-border"
       >
         <button
@@ -165,7 +166,7 @@ export function ProfileDetailsPage() {
               : "text-muted border-transparent hover:text-inherit"
           }`}
         >
-          Claims ({activeClaims.length})
+          {PROFILE.claimsTab(activeClaims.length)}
         </button>
         <button
           role="tab"
@@ -178,7 +179,7 @@ export function ProfileDetailsPage() {
               : "text-muted border-transparent hover:text-inherit"
           }`}
         >
-          Keys ({profile.keys.length})
+          {PROFILE.keysTab(profile.keys.length)}
         </button>
       </div>
 
@@ -195,10 +196,8 @@ export function ProfileDetailsPage() {
             ))
           ) : (
             <div className="text-center py-12 text-muted">
-              <p className="text-lg mb-1">No claims found</p>
-              <p className="text-sm">
-                This user hasn&apos;t published any identity claims yet.
-              </p>
+              <p className="text-lg mb-1">{PROFILE_EMPTY.noClaims}</p>
+              <p className="text-sm">{PROFILE_EMPTY.noClaimsDesc}</p>
             </div>
           )}
         </div>
@@ -214,10 +213,8 @@ export function ProfileDetailsPage() {
             profile.keys.map((key) => <KeyCard key={key.uri} keyRecord={key} />)
           ) : (
             <div className="text-center py-12 text-muted">
-              <p className="text-lg mb-1">No keys published</p>
-              <p className="text-sm">
-                This user hasn&apos;t published any public keys yet.
-              </p>
+              <p className="text-lg mb-1">{PROFILE_EMPTY.noKeys}</p>
+              <p className="text-sm">{PROFILE_EMPTY.noKeysDesc}</p>
             </div>
           )}
         </div>

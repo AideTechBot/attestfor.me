@@ -3,6 +3,7 @@ import type { DevKeytraceClaim } from "../../../types/keytrace";
 import { ServiceIcon } from "./ServiceIcon";
 import { SERVICE_NAMES } from "@/lib/global-features";
 import type { PendingClaim } from "./AddClaimWizard";
+import { CLAIMS, EDIT_LIST } from "@/lib/ui-strings";
 
 interface EditClaimListProps {
   /** Existing claims fetched from the repo */
@@ -29,8 +30,8 @@ export function EditClaimList({
     return (
       <div className="flex items-center justify-center px-3 py-2.5 border border-transparent">
         <div className="flex flex-col items-center">
-          <div className="text-sm text-muted">No claims yet.</div>
-          <div className="text-xs text-muted/60">Add one below.</div>
+          <div className="text-sm text-muted">{EDIT_LIST.noClaimsYet}</div>
+          <div className="text-xs text-muted/60">{EDIT_LIST.addOneBelow}</div>
         </div>
       </div>
     );
@@ -61,7 +62,7 @@ export function EditClaimList({
             </div>
             {staged && (
               <span className="text-xs text-red-400 font-semibold shrink-0">
-                will delete
+                {CLAIMS.willDelete}
               </span>
             )}
             <button
@@ -73,7 +74,7 @@ export function EditClaimList({
                   : "border-red-500/40 text-red-400 hover:bg-red-500/10"
               }`}
             >
-              {staged ? "Undo" : "Delete"}
+              {staged ? CLAIMS.undo : CLAIMS.delete}
             </button>
           </div>
         );
@@ -98,12 +99,12 @@ export function EditClaimList({
               </div>
               <div className="text-xs text-muted truncate">
                 {claim.value.identity.subject}
-                <span className="ml-2 text-red-400/70">· retracted</span>
+                <span className="ml-2 text-red-400/70">· {CLAIMS.retracted}</span>
               </div>
             </div>
             {staged && (
               <span className="text-xs text-red-400 font-semibold shrink-0">
-                will delete
+                {CLAIMS.willDelete}
               </span>
             )}
             <button
@@ -115,7 +116,7 @@ export function EditClaimList({
                   : "border-red-500/40 text-red-400 hover:bg-red-500/10"
               }`}
             >
-              {staged ? "Undo" : "Delete"}
+              {staged ? CLAIMS.undo : CLAIMS.delete}
             </button>
           </div>
         );
@@ -137,14 +138,14 @@ export function EditClaimList({
             </div>
           </div>
           <span className="text-xs text-green-400 font-semibold shrink-0">
-            new
+            {CLAIMS.new}
           </span>
           <button
             onClick={() => onRemoveAdd(pending.tempId)}
             title="Remove"
             className="shrink-0 text-xs px-2 py-1 border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            Remove
+            {CLAIMS.remove}
           </button>
         </div>
       ))}

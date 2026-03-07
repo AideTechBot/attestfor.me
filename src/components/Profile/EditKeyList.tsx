@@ -4,6 +4,7 @@ import type { AtProtoRecord } from "@/lib/atproto";
 import type { DevKeytraceUserPublicKey } from "../../../types/keytrace";
 import type { PendingKey } from "./AddKeyWizard";
 import { KEY_TYPE_LABELS } from "@/lib/global-features";
+import { NAV, KEYS, KEY_RETRACT, CLAIMS, EDIT_LIST } from "@/lib/ui-strings";
 
 interface EditKeyListProps {
   existing: AtProtoRecord<DevKeytraceUserPublicKey.Main>[];
@@ -39,11 +40,10 @@ function RetractConfirmDialog({
           <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
           <div>
             <div className="text-sm font-semibold text-white">
-              Retract this key?
+              {KEY_RETRACT.title}
             </div>
             <div className="text-xs text-muted mt-1">
-              <span className="font-semibold text-white/80">{keyLabel}</span>{" "}
-              will be permanently marked as retracted. This cannot be undone.
+              {KEY_RETRACT.warning(keyLabel)}
             </div>
           </div>
         </div>
@@ -52,13 +52,13 @@ function RetractConfirmDialog({
             onClick={onCancel}
             className="flex-1 py-2 text-sm border border-surface-border text-muted hover:text-white hover:border-muted transition-colors bg-transparent"
           >
-            Cancel
+            {NAV.cancel}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2 text-sm border border-orange-500/60 text-orange-400 hover:bg-orange-500/10 transition-colors font-semibold"
           >
-            Yes, retract permanently
+            {KEY_RETRACT.confirm}
           </button>
         </div>
       </div>
@@ -101,8 +101,8 @@ export function EditKeyList({
     return (
       <div className="flex items-center justify-center px-3 py-2.5 border border-transparent">
         <div className="flex flex-col items-center">
-          <div className="text-sm text-muted">No keys yet.</div>
-          <div className="text-xs text-muted/60">Add one below.</div>
+          <div className="text-sm text-muted">{EDIT_LIST.noKeysYet}</div>
+          <div className="text-xs text-muted/60">{EDIT_LIST.addOneBelow}</div>
         </div>
       </div>
     );
@@ -156,12 +156,12 @@ export function EditKeyList({
               </div>
               {stagedDelete && (
                 <span className="text-xs text-red-400 font-semibold shrink-0">
-                  will delete
+                  {CLAIMS.willDelete}
                 </span>
               )}
               {stagedRetract && (
                 <span className="text-xs text-orange-400 font-semibold shrink-0">
-                  will retract
+                  {KEYS.willRetract}
                 </span>
               )}
               {!staged && (
@@ -170,7 +170,7 @@ export function EditKeyList({
                   title="Retract key (permanent)"
                   className="shrink-0 text-xs px-2 py-1 border border-orange-500/40 text-orange-400 hover:bg-orange-500/10 transition-colors"
                 >
-                  Retract
+                  {KEYS.retract}
                 </button>
               )}
               {stagedRetract && (
@@ -179,7 +179,7 @@ export function EditKeyList({
                   title="Undo retract"
                   className="shrink-0 text-xs px-2 py-1 border border-surface-border text-muted hover:border-accent hover:text-white transition-colors"
                 >
-                  Undo
+                  {CLAIMS.undo}
                 </button>
               )}
               {!staged && (
@@ -188,7 +188,7 @@ export function EditKeyList({
                   title="Delete key"
                   className="shrink-0 text-xs px-2 py-1 border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
                 >
-                  Delete
+                  {CLAIMS.delete}
                 </button>
               )}
               {stagedDelete && (
@@ -197,7 +197,7 @@ export function EditKeyList({
                   title="Undo delete"
                   className="shrink-0 text-xs px-2 py-1 border border-surface-border text-muted hover:border-accent hover:text-white transition-colors"
                 >
-                  Undo
+                  {CLAIMS.undo}
                 </button>
               )}
             </div>
@@ -225,13 +225,13 @@ export function EditKeyList({
                 <div className="text-xs text-muted font-mono truncate">
                   {key.value.fingerprint}
                   <span className="ml-2 text-orange-400/70 font-sans">
-                    · retracted
+                    · {CLAIMS.retracted}
                   </span>
                 </div>
               </div>
               {staged && (
                 <span className="text-xs text-red-400 font-semibold shrink-0">
-                  will delete
+                  {CLAIMS.willDelete}
                 </span>
               )}
               <button
@@ -243,7 +243,7 @@ export function EditKeyList({
                     : "border-red-500/40 text-red-400 hover:bg-red-500/10"
                 }`}
               >
-                {staged ? "Undo" : "Delete"}
+                {staged ? CLAIMS.undo : CLAIMS.delete}
               </button>
             </div>
           );
@@ -267,14 +267,14 @@ export function EditKeyList({
               </div>
             </div>
             <span className="text-xs text-green-400 font-semibold shrink-0">
-              new
+              {CLAIMS.new}
             </span>
             <button
               onClick={() => onRemoveAdd(pending.tempId)}
               title="Remove"
               className="shrink-0 text-xs px-2 py-1 border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
             >
-              Remove
+              {CLAIMS.remove}
             </button>
           </div>
         ))}

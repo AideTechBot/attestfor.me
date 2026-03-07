@@ -25,6 +25,7 @@ import { useAtprotoSearch } from "@/lib/use-atproto-search";
 import { useRandomFollowers } from "@/lib/use-random-followers";
 import { thumbnailAvatar } from "@/lib/bsky";
 import { VerificationProvider } from "@/lib/verification-context";
+import { SEARCH, NAV, AUTH, MISC } from "@/lib/ui-strings";
 import "./search-animated.css";
 
 interface PageLayoutProps {
@@ -47,11 +48,11 @@ const MENU_ITEM_CLASS =
 export const FOOTER_LINKS = [
   {
     href: "https://bsky.app/profile/manoo.dev",
-    label: "made by manoo",
+    label: NAV.madeBy,
   },
-  { href: "https://github.com/AideTechBot/attestfor.me", label: "github" },
-  { href: "https://tangled.com/repo/attestfor.me", label: "tangled" },
-  { href: "/faq", label: "faq", internal: true },
+  { href: "https://github.com/AideTechBot/attestfor.me", label: NAV.github },
+  { href: "https://tangled.com/repo/attestfor.me", label: NAV.tangled },
+  { href: "/faq", label: NAV.faq, internal: true },
 ] as const;
 
 export function PageLayout({ children }: PageLayoutProps) {
@@ -228,7 +229,7 @@ export function PageLayout({ children }: PageLayoutProps) {
           <Link
             to="/"
             className="font-bold text-lg text-accent whitespace-nowrap"
-            aria-label="Go to homepage"
+            aria-label={NAV.goToHomepage}
             tabIndex={isHomePage ? -1 : 0}
           >
             attestfor.me
@@ -251,8 +252,8 @@ export function PageLayout({ children }: PageLayoutProps) {
             <Input
               ref={inputRef}
               type="text"
-              aria-label="Search for a user"
-              placeholder="Search..."
+              aria-label={SEARCH.ariaLabel}
+              placeholder={SEARCH.placeholder}
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               onFocus={() => {
@@ -313,8 +314,8 @@ export function PageLayout({ children }: PageLayoutProps) {
             <DropdownMenuTrigger
               aria-label={
                 session.authenticated
-                  ? `${session.displayName || session.handle || "Account"} menu`
-                  : "Account menu"
+                  ? `${session.displayName || session.handle || MISC.accountMenu} menu`
+                  : MISC.accountMenu
               }
               className={cn(
                 "relative w-8 h-8 min-h-8 bg-surface border border-surface-border box-border",
@@ -350,14 +351,14 @@ export function PageLayout({ children }: PageLayoutProps) {
                       onClick={() => setShowLoginInput(true)}
                       className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm text-left hover:bg-accent hover:text-white focus:bg-accent focus:text-white transition-colors"
                     >
-                      Sign in
+                      {NAV.signIn}
                     </button>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <input
                         type="text"
-                        aria-label="Your AT Protocol handle"
-                        placeholder="your.handle.example"
+                        aria-label={AUTH.handleLabel}
+                        placeholder={AUTH.handlePlaceholder}
                         value={loginHandle}
                         onChange={(e) => setLoginHandle(e.target.value)}
                         onKeyDown={(e) => {
@@ -380,10 +381,10 @@ export function PageLayout({ children }: PageLayoutProps) {
                         {isLoggingIn ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Signing in...</span>
+                            <span>{AUTH.signingIn}</span>
                           </>
                         ) : (
-                          "Continue"
+                          NAV.continue
                         )}
                       </button>
                     </div>
@@ -396,7 +397,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                       className={cn("whitespace-nowrap", MENU_ITEM_CLASS)}
                       onSelect={() => navigate(`/@${session.handle}/details`)}
                     >
-                      <span>Visit profile</span>
+                      <span>{NAV.visitProfile}</span>
                       <ExternalLink className="w-4 h-4 ml-auto" />
                     </DropdownMenuItem>
                   )}
@@ -404,13 +405,13 @@ export function PageLayout({ children }: PageLayoutProps) {
                     className={MENU_ITEM_CLASS}
                     onSelect={() => navigate("/edit/claims")}
                   >
-                    Edit profile
+                    {NAV.editProfile}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className={MENU_ITEM_CLASS}
                     onSelect={handleLogout}
                   >
-                    Sign out
+                    {NAV.signOut}
                   </DropdownMenuItem>
                 </>
               )}

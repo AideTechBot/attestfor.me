@@ -1,6 +1,8 @@
 # attestfor.me
 
-A decentralized identity verification service built on AT Protocol. Link and verify your social accounts (GitHub, Twitter/X, Mastodon, etc.), domains, and cryptographic keys to your Bluesky identity. It aims to be a "Linktree-like" experience with verification that the links you click verified to be owned by the user.
+A Linktree-style profile page for AT Protocol, but with proof.
+
+Add links to your GitHub, Twitter, website, and other accounts. When someone visits your page, they can verify that you actually own those accounts, not just that you typed them in. No trust required, because it's already proven.
 
 ## Features
 

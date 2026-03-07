@@ -1,4 +1,5 @@
 import { Loader2, Check, X } from "lucide-react";
+import { VERIFY } from "@/lib/ui-strings";
 
 export type VerifyStatus = "idle" | "loading" | "verified" | "failed";
 
@@ -40,7 +41,7 @@ export function StatusBadge({ status, onVerify }: StatusBadgeProps) {
         onVerify?.();
       }}
       className="shrink-0 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/40 text-xs font-bold cursor-pointer hover:bg-white/15 transition-colors"
-      aria-label="Verify this account"
+      aria-label={VERIFY.verifyThisAccount}
     >
       ?
     </button>

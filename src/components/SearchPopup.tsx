@@ -1,6 +1,7 @@
 import { X, Loader2 } from "lucide-react";
 import type { AtprotoActor } from "@/lib/use-atproto-search";
 import { thumbnailAvatar } from "@/lib/bsky";
+import { SEARCH, NAV } from "@/lib/ui-strings";
 
 interface SearchPopupProps {
   visible: boolean;
@@ -60,7 +61,7 @@ export function SearchPopup({
           onClick={() => onSelect(cleanQuery)}
           className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-white transition-colors flex items-center gap-2 cursor-pointer"
         >
-          <span className="text-muted">Go to</span>
+          <span className="text-muted">{SEARCH.goTo}</span>
           <span className="font-medium">@{cleanQuery}</span>
         </button>
       )}
@@ -69,7 +70,7 @@ export function SearchPopup({
       {showSuggestions && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 border-t border-surface-border">
-            <span className="text-xs text-muted">Suggestions</span>
+            <span className="text-xs text-muted">{SEARCH.suggestions}</span>
             {suggestionsLoading && (
               <Loader2 className="w-3 h-3 text-muted animate-spin" />
             )}
@@ -112,7 +113,7 @@ export function SearchPopup({
       {showFollowSuggestions && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 border-t border-surface-border first:border-t-0">
-            <span className="text-xs text-muted">From your followers</span>
+            <span className="text-xs text-muted">{SEARCH.fromFollowers}</span>
           </div>
           {followSuggestions.map((actor) => (
             <button
@@ -152,7 +153,7 @@ export function SearchPopup({
       {showRecent && (
         <>
           <div className="flex items-center justify-between px-3 py-1.5 border-t border-surface-border">
-            <span className="text-xs text-muted">Recent</span>
+            <span className="text-xs text-muted">{SEARCH.recent}</span>
             {!cleanQuery && (
               <button
                 type="button"
@@ -160,7 +161,7 @@ export function SearchPopup({
                 onClick={onClearAll}
                 className="text-xs text-muted hover:text-accent transition-colors cursor-pointer"
               >
-                Clear all
+                {NAV.clearAll}
               </button>
             )}
           </div>
@@ -182,7 +183,7 @@ export function SearchPopup({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onRemove(handle)}
                 className="px-2 py-2 text-muted hover:text-white transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                aria-label={`Remove ${handle} from recent searches`}
+                aria-label={SEARCH.removeRecent(handle)}
               >
                 <X className="w-3 h-3" />
               </button>

@@ -13,6 +13,11 @@ import type {
 } from "@/lib/verification-context";
 import { createProxiedFetch } from "@/lib/proxied-fetch";
 import { getApiBase } from "@/lib/get-api-base";
+import {
+  VERIFY_ERRORS,
+  VERIFY_STEPS,
+  CLAIM_ERRORS,
+} from "@/lib/ui-strings";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -28,7 +33,7 @@ export function getVerifyErrorMessage(result: ClaimVerificationResult): string {
 
   const details = result.proofDetails;
   if (!details?.targets) {
-    return "Verification failed — no proof content was found.";
+    return VERIFY_ERRORS.noProofContent;
   }
 
   // Check if any target path had values
@@ -44,13 +49,13 @@ export function getVerifyErrorMessage(result: ClaimVerificationResult): string {
       .map((p) => p.replace("files.", "").replace(".content", ""));
 
     if (expectedPaths.length > 0) {
-      return `No expected file found. Please name your file one of: ${expectedPaths.join(", ")}`;
+      return VERIFY_ERRORS.noExpectedFile(expectedPaths.join(", "));
     }
-    return "No proof content was found at the expected location.";
+    return VERIFY_ERRORS.noContentAtLocation;
   }
 
   // Values were found but DID wasn't in them
-  return "DID not found in claim content. Make sure the proof text matches exactly.";
+  return VERIFY_ERRORS.didNotFound;
 }
 
 /**
@@ -78,7 +83,7 @@ async function verifyDnsViaServer(domain: string, did: string): Promise<boolean>
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || "DNS lookup failed");
+    throw new Error(data.error || CLAIM_ERRORS.dnsLookupFailed);
   }
 
   const data = (await response.json()) as {
@@ -110,7 +115,7 @@ export async function runVerification(
       uri,
       result: {
         success: false,
-        error: `No verifier available for "${value.type}"`,
+        error: CLAIM_ERRORS.noVerifier(value.type),
         errorCode: "NO_VERIFIER",
       },
       steps: [],
@@ -153,12 +158,12 @@ export async function runVerification(
 
   try {
     // Step 1: Match claim URI
-    addStep("Match claim", "pending", "Checking claim URI against providers…");
+    addStep("Match claim", "pending", VERIFY_STEPS.checkingUri);
     const provider = matches[0].provider;
-    updateLastStep("success", `Matched provider: ${provider.name}`);
+    updateLastStep("success", VERIFY_STEPS.matchedProvider(provider.name));
 
     // Step 2: Verify claim
-    addStep("Verify claim", "pending", "Fetching claim content and verifying…");
+    addStep("Verify claim", "pending", VERIFY_STEPS.fetchingContent);
 
     // DNS claims need special handling (browser can't do DNS lookups)
     if (value.type === "dns" && value.claimUri.startsWith("dns:")) {
@@ -166,7 +171,7 @@ export async function runVerification(
       const verified = await verifyDnsViaServer(domain, did);
 
       if (verified) {
-        updateLastStep("success", "DID found in DNS TXT records");
+        updateLastStep("success", VERIFY_STEPS.didFoundInDns);
 
         dispatch({
           type: "VERIFY_DONE",
@@ -175,17 +180,14 @@ export async function runVerification(
           steps: [...currentSteps],
         });
       } else {
-        updateLastStep(
-          "error",
-          `No matching TXT record found at _keytrace.${domain}`,
-        );
+        updateLastStep("error", VERIFY_ERRORS.noTxtRecord(domain));
 
         dispatch({
           type: "VERIFY_DONE",
           uri,
           result: {
             success: false,
-            error: `No matching TXT record found at _keytrace.${domain}`,
+            error: VERIFY_ERRORS.noTxtRecord(domain),
             errorCode: "VERIFICATION_FAILED",
           },
           steps: [...currentSteps],
@@ -204,7 +206,7 @@ export async function runVerification(
       updateLastStep("success", "DID found in claim content");
 
       // Step 3: Handle check (attestfor.me-specific)
-      addStep("Check handle", "pending", "Verifying identity handle…");
+      addStep("Check handle", "pending", VERIFY_STEPS.verifyingHandle);
 
       const expectedHandle = value.identity.subject
         .toLowerCase()
@@ -216,14 +218,14 @@ export async function runVerification(
       if (actualSubject && actualSubject !== expectedHandle) {
         updateLastStep(
           "error",
-          `Handle mismatch: expected "${expectedHandle}", got "${actualSubject}"`,
+          VERIFY_ERRORS.handleMismatch(expectedHandle, actualSubject),
         );
         dispatch({
           type: "VERIFY_DONE",
           uri,
           result: {
             success: false,
-            error: `Handle mismatch: expected "${expectedHandle}", got "${actualSubject}"`,
+            error: VERIFY_ERRORS.handleMismatch(expectedHandle, actualSubject),
             errorCode: "HANDLE_MISMATCH",
           },
           steps: [...currentSteps],
@@ -233,7 +235,7 @@ export async function runVerification(
 
       updateLastStep(
         "success",
-        `Handle verified: ${result.identity?.subject ?? expectedHandle}`,
+        VERIFY_STEPS.handleVerified(result.identity?.subject ?? expectedHandle),
       );
 
       dispatch({

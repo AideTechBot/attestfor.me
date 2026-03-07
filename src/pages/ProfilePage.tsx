@@ -13,6 +13,7 @@ import type {
 import { Share2, Check } from "lucide-react";
 import { getClaimStatusLabel } from "@/lib/claim-status-label";
 import { useVerificationStatuses } from "@/lib/verification-context";
+import { PROFILE, PROFILE_EMPTY, NAV } from "@/lib/ui-strings";
 
 interface ProfileData {
   handle: string;
@@ -182,8 +183,8 @@ export function ProfilePage() {
                 <div className="relative shrink-0 flex">
                   <button
                     onClick={handleShare}
-                    title="Share profile"
-                    aria-label="Share profile"
+                    title={PROFILE.shareProfile}
+                    aria-label={PROFILE.shareProfile}
                     className="w-9 flex items-center justify-center border border-surface-border text-muted hover:text-white hover:border-muted cursor-pointer transition-colors bg-transparent"
                   >
                     {copied ? (
@@ -194,7 +195,7 @@ export function ProfilePage() {
                   </button>
                   {copied && (
                     <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-surface border border-surface-border text-xs text-white whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
-                      Copied!
+                      {PROFILE.copied}
                     </span>
                   )}
                 </div>
@@ -211,10 +212,8 @@ export function ProfilePage() {
           </div>
         ) : (
           <div className="text-center py-8 text-muted">
-            <p className="text-lg mb-1">No verified accounts yet</p>
-            <p className="text-sm">
-              This user hasn&apos;t linked any external accounts.
-            </p>
+            <p className="text-lg mb-1">{PROFILE_EMPTY.noAccounts}</p>
+            <p className="text-sm">{PROFILE_EMPTY.noAccountsDesc}</p>
           </div>
         )}
 
@@ -225,7 +224,7 @@ export function ProfilePage() {
               to={`/${profile.handle}/details`}
               className="text-xs text-muted hover:text-white transition-colors"
             >
-              View technical details
+              {NAV.viewDetails}
             </Link>
           </div>
         </div>

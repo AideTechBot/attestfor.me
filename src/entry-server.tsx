@@ -72,7 +72,7 @@ export async function render(request: Request) {
       const claimCount = data.claims?.length ?? 0;
       const keyCount = data.keys?.length ?? 0;
 
-      metaTitle = `${name} (@${data.handle}) — ATtestfor.me`;
+      metaTitle = `${name} (@${data.handle}) | ATtestfor.me`;
 
       if (data.description) {
         metaDescription = `${data.description} · ${claimCount} verified account${claimCount !== 1 ? "s" : ""} on ATtestfor.me.`;

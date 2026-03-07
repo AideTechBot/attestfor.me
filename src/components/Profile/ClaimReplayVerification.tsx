@@ -2,6 +2,7 @@ import type { AtProtoRecord } from "@/lib/atproto";
 import type { DevKeytraceClaim } from "../../../types/keytrace";
 import { useVerification } from "@/lib/verification-context";
 import { runVerification, hasVerifierForUri } from "@/lib/run-verification";
+import { CLAIMS, CLAIM_ERRORS, VERIFY } from "@/lib/ui-strings";
 
 interface ClaimReplayVerificationProps {
   claim: AtProtoRecord<DevKeytraceClaim.Main>;
@@ -33,7 +34,7 @@ export function ClaimReplayVerification({
   if (!hasVerifier) {
     return (
       <div className="text-xs text-muted">
-        No verifier available for {claim.value.type}
+        {CLAIM_ERRORS.noVerifier(claim.value.type)}
       </div>
     );
   }
@@ -45,7 +46,7 @@ export function ClaimReplayVerification({
         disabled={verifying || rateLimited}
         className="w-full h-10 flex items-center justify-center text-xs font-semibold bg-accent text-white border-none cursor-pointer hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {verifying ? "Verifying…" : "Replay verification"}
+        {verifying ? CLAIMS.verifying : VERIFY.replayVerification}
       </button>
 
       {/* Steps */}
@@ -77,8 +78,8 @@ export function ClaimReplayVerification({
           }`}
         >
           {result.success
-            ? "✓ Claim is valid"
-            : `✗ Claim is invalid: ${result.error}`}
+            ? `✓ ${VERIFY.claimValid}`
+            : `✗ ${VERIFY.claimInvalid(result.error ?? "")}`}
         </div>
       )}
     </div>

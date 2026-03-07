@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AtProtoRecord } from "@/lib/atproto";
 import type { DevKeytraceUserPublicKey } from "../../../types/keytrace";
 import { KEY_TYPE_LABELS } from "@/lib/global-features";
+import { KEYS, PROFILE } from "@/lib/ui-strings";
 
 interface KeyCardProps {
   keyRecord: AtProtoRecord<DevKeytraceUserPublicKey.Main>;
@@ -57,7 +58,7 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
               : "bg-yellow-500/10 text-yellow-400"
           }`}
         >
-          {isRevoked ? "Retracted" : "Expired"}
+          {isRevoked ? KEYS.retracted : KEYS.expired}
         </div>
       )}
 
@@ -82,7 +83,7 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
           {/* Fingerprint */}
           {value.fingerprint && (
             <div className="text-xs mt-2">
-              <span className="text-muted">Fingerprint:</span>{" "}
+              <span className="text-muted">{KEYS.fingerprint}</span>{" "}
               <code className="font-mono bg-page px-1.5 py-0.5 border border-surface-border break-all">
                 {value.fingerprint}
               </code>
@@ -90,12 +91,12 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
           )}
           {/* Dates */}
           <div className="flex gap-4 text-xs text-muted mt-2">
-            <span>Published: {formatDate(value.createdAt)}</span>
+            <span>{KEYS.published} {formatDate(value.createdAt)}</span>
             {value.expiresAt && (
               <span
                 className={isExpired ? "text-yellow-400 font-semibold" : ""}
               >
-                {isExpired ? "Expired" : "Expires"}:{" "}
+                {isExpired ? KEYS.expired : KEYS.expires}{" "}
                 {formatDate(value.expiresAt)}
               </span>
             )}
@@ -109,13 +110,13 @@ export function KeyCard({ keyRecord }: KeyCardProps) {
             aria-expanded={expanded}
             className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
           >
-            {expanded ? "Hide public key" : "Show public key"}
+            {expanded ? KEYS.hidePublicKey : KEYS.showPublicKey}
           </button>
           <button
             onClick={copyPublicKey}
             className="text-xs text-accent bg-transparent border-none cursor-pointer hover:underline p-0"
           >
-            {copied ? "Copied!" : "Copy public key"}
+            {copied ? PROFILE.copied : KEYS.copyPublicKey}
           </button>
         </div>
 

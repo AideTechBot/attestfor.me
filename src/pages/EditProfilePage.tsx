@@ -28,6 +28,16 @@ import {
   type PendingKey,
 } from "@/components/Profile/AddKeyWizard";
 import { EditKeyList } from "@/components/Profile/EditKeyList";
+import {
+  NAV,
+  AUTH,
+  LOADING,
+  ERRORS,
+  SUCCESS,
+  CLAIMS,
+  KEYS,
+  EDIT_PROFILE,
+} from "@/lib/ui-strings";
 
 interface SessionData {
   authenticated: boolean;
@@ -206,7 +216,7 @@ export function EditProfilePage() {
 
     try {
       await Promise.all(ops);
-      toast.success("Changes saved successfully.");
+      toast.success(SUCCESS.changesSaved);
       setClaimsToDelete(new Set());
       setClaimsToAdd([]);
       setKeysToDelete(new Set());
@@ -214,7 +224,7 @@ export function EditProfilePage() {
       setKeysToAdd([]);
       await Promise.all([refetchClaims(), refetchKeys()]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Save failed.");
+      toast.error(e instanceof Error ? e.message : ERRORS.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -235,7 +245,7 @@ export function EditProfilePage() {
   if (sessionLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted text-sm">
-        Loading…
+        {LOADING.loading}
       </div>
     );
   }
@@ -243,11 +253,9 @@ export function EditProfilePage() {
   if (!session?.authenticated) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <p className="text-muted text-sm">
-          You must be signed in to edit claims.
-        </p>
+        <p className="text-muted text-sm">{AUTH.mustBeSignedIn}</p>
         <Link to="/" className="text-xs text-accent hover:underline">
-          <ArrowLeft className="w-3.5 h-3.5 inline" /> Back
+          <ArrowLeft className="w-3.5 h-3.5 inline" /> {NAV.back}
         </Link>
       </div>
     );
@@ -264,10 +272,10 @@ export function EditProfilePage() {
         to={`/@${session.handle}/details`}
         className="-mx-6 -mt-6 flex items-center mb-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold text-sm transition-colors no-underline"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
+        <ArrowLeft className="w-3.5 h-3.5" /> {NAV.backToProfile}
       </Link>
 
-      <h1 className="text-lg font-semibold m-0">Edit profile</h1>
+      <h1 className="text-lg font-semibold m-0">{EDIT_PROFILE.title}</h1>
 
       {/* ── Tabs ── */}
       <div className="flex border-b border-surface-border">
@@ -302,16 +310,16 @@ export function EditProfilePage() {
         <>
           {claimsLoading ? (
             <div className="text-xs text-muted py-4 text-center">
-              Loading claims…
+              {LOADING.loadingClaims}
             </div>
           ) : claimsError ? (
             <div className="text-xs text-red-400 py-4 text-center">
-              Failed to load claims.{" "}
+              {ERRORS.failedToLoadClaims}{" "}
               <button
                 onClick={() => void refetchClaims()}
                 className="underline hover:no-underline"
               >
-                Retry
+                {NAV.retry}
               </button>
             </div>
           ) : (
@@ -329,7 +337,7 @@ export function EditProfilePage() {
               onClick={() => setShowClaimWizard(true)}
               className="w-full py-2.5 text-sm border border-dashed border-surface-border text-muted hover:border-accent hover:text-accent transition-colors bg-transparent"
             >
-              + Add claim
+              {CLAIMS.addClaim}
             </button>
           )}
         </>
@@ -340,16 +348,16 @@ export function EditProfilePage() {
         <>
           {keysLoading ? (
             <div className="text-xs text-muted py-4 text-center">
-              Loading keys…
+              {LOADING.loadingKeys}
             </div>
           ) : keysError ? (
             <div className="text-xs text-red-400 py-4 text-center">
-              Failed to load keys.{" "}
+              {ERRORS.failedToLoadKeys}{" "}
               <button
                 onClick={() => void refetchKeys()}
                 className="underline hover:no-underline"
               >
-                Retry
+                {NAV.retry}
               </button>
             </div>
           ) : (
@@ -369,7 +377,7 @@ export function EditProfilePage() {
               onClick={() => setShowKeyWizard(true)}
               className="w-full py-2.5 text-sm border border-dashed border-surface-border text-muted hover:border-accent hover:text-accent transition-colors bg-transparent"
             >
-              + Add key
+              {KEYS.addKey}
             </button>
           )}
         </>
@@ -427,7 +435,7 @@ export function EditProfilePage() {
             disabled={saving}
             className="flex-1 py-2.5 text-sm border border-surface-border hover:border-muted transition-colors bg-transparent disabled:opacity-50"
           >
-            Discard changes
+            {NAV.discard}
           </button>
           <button
             onClick={() => void handleSave()}
@@ -437,10 +445,10 @@ export function EditProfilePage() {
             {saving ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Saving…
+                {NAV.saving}
               </>
             ) : (
-              `Save changes (${claimsToAdd.length + claimsToDelete.size + keysToAdd.length + keysToDelete.size + keysToRetract.size})`
+              EDIT_PROFILE.saveChanges(claimsToAdd.length + claimsToDelete.size + keysToAdd.length + keysToDelete.size + keysToRetract.size)
             )}
           </button>
         </div>
@@ -451,31 +459,27 @@ export function EditProfilePage() {
         <div className="text-xs text-muted space-y-0.5">
           {claimsToAdd.length > 0 && (
             <div className="text-green-400">
-              + {claimsToAdd.length} claim{claimsToAdd.length !== 1 ? "s" : ""}{" "}
-              to add
+              {EDIT_PROFILE.claimsToAdd(claimsToAdd.length)}
             </div>
           )}
           {claimsToDelete.size > 0 && (
             <div className="text-red-400">
-              − {claimsToDelete.size} claim
-              {claimsToDelete.size !== 1 ? "s" : ""} to delete
+              {EDIT_PROFILE.claimsToDelete(claimsToDelete.size)}
             </div>
           )}
           {keysToAdd.length > 0 && (
             <div className="text-green-400">
-              + {keysToAdd.length} key{keysToAdd.length !== 1 ? "s" : ""} to add
+              {EDIT_PROFILE.keysToAdd(keysToAdd.length)}
             </div>
           )}
           {keysToRetract.size > 0 && (
             <div className="text-orange-400">
-              ⊘ {keysToRetract.size} key{keysToRetract.size !== 1 ? "s" : ""} to
-              retract
+              {EDIT_PROFILE.keysToRetract(keysToRetract.size)}
             </div>
           )}
           {keysToDelete.size > 0 && (
             <div className="text-red-400">
-              − {keysToDelete.size} key{keysToDelete.size !== 1 ? "s" : ""} to
-              delete
+              {EDIT_PROFILE.keysToDelete(keysToDelete.size)}
             </div>
           )}
         </div>

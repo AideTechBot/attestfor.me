@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
+import { FAQ } from "@/lib/ui-strings";
 
 interface FaqItem {
   q: string;
@@ -173,10 +174,8 @@ export function FaqPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center shrink-0">
-        <h1 className="text-2xl font-bold text-accent m-0 mb-1">FAQ</h1>
-        <p className="text-sm text-muted m-0">
-          Everything you need to know about ATtestfor.me
-        </p>
+        <h1 className="text-2xl font-bold text-accent m-0 mb-1">{FAQ.title}</h1>
+        <p className="text-sm text-muted m-0">{FAQ.subtitle}</p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -190,7 +189,7 @@ export function FaqPage() {
 
       <div className="text-center text-xs text-muted pt-2 pb-1">
         <Link to="/" className="hover:text-accent transition-colors">
-          <ArrowLeft className="w-3 h-3 inline" /> Back to home
+          <ArrowLeft className="w-3 h-3 inline" /> {FAQ.backToHome}
         </Link>
       </div>
     </div>

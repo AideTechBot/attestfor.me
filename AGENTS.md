@@ -4,10 +4,11 @@ Guidelines for AI agents working on this codebase.
 
 ## Important Rules
 
-- **Never ask to start the dev server** — assume it's already running. The user manages the server themselves.
-- **Never ask to run tests after changes** — run them yourself if you need to verify.
+- **Never ask to start the dev server** -assume it's already running. The user manages the server themselves.
+- **Never ask to run tests after changes** -run them yourself if you need to verify.
 - **Don't create documentation files** unless explicitly requested.
-- **Search for existing utilities first** — before creating new helpers, search the codebase. Many common patterns already have implementations. Don't reinvent the wheel.
+- **Search for existing utilities first** - before creating new helpers, search the codebase. Many common patterns already have implementations. Don't reinvent the wheel.
+- **No em dashes** - use regular hyphens or commas instead.
 
 ## Project Overview
 
@@ -73,27 +74,28 @@ DNS claims cannot be verified client-side (browser can't do DNS lookups). The `v
 
 | File | Contents |
 |------|----------|
-| `routes/proxy-utils.ts` | `checkRateLimit()`, `getClientIp()`, `isPrivateHost()`, `validateProxyUrl()`, `isValidDomain()` — shared security utilities for all proxy endpoints |
-| `storage.ts` | `store.get()`, `store.set()`, `store.del()` — Redis/in-memory key-value storage |
-| `oauth.ts` | `restoreSession()`, `getSession()`, `setSession()` — OAuth session management |
+| `routes/proxy-utils.ts` | `checkRateLimit()`, `getClientIp()`, `isPrivateHost()`, `validateProxyUrl()`, `isValidDomain()` -shared security utilities for all proxy endpoints |
+| `storage.ts` | `store.get()`, `store.set()`, `store.del()` -Redis/in-memory key-value storage |
+| `oauth.ts` | `restoreSession()`, `getSession()`, `setSession()` -OAuth session management |
 | `cache-ttl.ts` | Cache TTL constants |
 
 ### Client Utilities (`src/lib/`)
 
 | File | Contents |
 |------|----------|
-| `utils.ts` | `cn()` — Tailwind class name merger (clsx + tailwind-merge) |
+| `utils.ts` | `cn()` -Tailwind class name merger (clsx + tailwind-merge) |
 | `constants.ts` | `SESSION_COOKIE_NAME` and other shared constants |
-| `global-features.ts` | `SERVICE_NAMES`, `KEY_TYPE_LABELS` — display labels for services and key types |
-| `atproto.ts` | `createRecord()`, `deleteRecord()`, `putRecord()`, `retractKey()`, `parseAtUri()` — AT Protocol operations |
-| `bsky.ts` | `getProfile()`, `resolveHandle()`, `listRecords()` — Bluesky API helpers |
-| `proxied-fetch.ts` | `proxiedFetch()` — fetch wrapper that routes through server proxy for CORS |
-| `run-verification.ts` | `runVerification()`, `verifyDnsViaServer()` — claim verification using @keytrace/runner |
-| `key-parser.ts` | `parsePublicKey()` — parses PGP/SSH public keys |
-| `claim-status-label.ts` | `getClaimStatusLabel()` — human-readable status text |
-| `claim-border-colour.ts` | `getClaimBorderColour()` — status-based border colors |
+| `global-features.ts` | `SERVICE_NAMES`, `KEY_TYPE_LABELS` -display labels for services and key types |
+| `atproto.ts` | `createRecord()`, `deleteRecord()`, `putRecord()`, `retractKey()`, `parseAtUri()` -AT Protocol operations |
+| `bsky.ts` | `getProfile()`, `resolveHandle()`, `listRecords()` -Bluesky API helpers |
+| `proxied-fetch.ts` | `proxiedFetch()` -fetch wrapper that routes through server proxy for CORS |
+| `run-verification.ts` | `runVerification()`, `verifyDnsViaServer()` -claim verification using @keytrace/runner |
+| `key-parser.ts` | `parsePublicKey()` -parses PGP/SSH public keys |
+| `claim-status-label.ts` | `getClaimStatusLabel()` -human-readable status text |
+| `claim-border-colour.ts` | `getClaimBorderColour()` -status-based border colors |
 | `error-handler.ts` | Error handling utilities |
 | `hooks.ts` | Shared React hooks |
+| `ui-strings.ts` | **All user-facing text** - buttons, labels, errors, messages. Always use this for new strings. |
 
 ## Testing
 

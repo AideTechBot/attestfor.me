@@ -14,11 +14,19 @@ import { ids } from "../../../types/keytrace";
 import { createProxiedFetch } from "@/lib/proxied-fetch";
 import { getVerifyErrorMessage } from "@/lib/run-verification";
 import { getApiBase } from "@/lib/get-api-base";
+import {
+  NAV,
+  CLAIMS,
+  CLAIM_WIZARD,
+  CLAIM_ERRORS,
+  PROFILE,
+  VERIFY_ERRORS,
+} from "@/lib/ui-strings";
 
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface PendingClaim {
-  /** Temporary client-side id — not the final rkey */
+  /** Temporary client-side id - not the final rkey */
   tempId: string;
   record: DevKeytraceClaim.Main;
   /** Whether the claim passed verification before being staged */
@@ -97,7 +105,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || "DNS lookup failed");
+      throw new Error(data.error || CLAIM_ERRORS.dnsLookupFailed);
     }
 
     const data = (await response.json()) as {
@@ -144,11 +152,11 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
           setStep("done");
         } else {
           setVerifyError(
-            `No matching TXT record found at _keytrace.${serviceHandle.trim()}. DNS changes may take a few minutes to propagate.`,
+            `${VERIFY_ERRORS.noTxtRecord(serviceHandle.trim())}. ${CLAIM_WIZARD.dnsPropagation}`,
           );
         }
       } catch (e) {
-        setVerifyError(e instanceof Error ? e.message : "DNS verification failed.");
+        setVerifyError(e instanceof Error ? e.message : CLAIM_ERRORS.dnsVerificationFailed);
       } finally {
         setVerifying(false);
       }
@@ -161,9 +169,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
     // Quick sanity: does the runner recognise this URI?
     const matches = serviceProviders.matchUri(claimUri);
     if (matches.length === 0) {
-      setVerifyError(
-        "This URL doesn't match any known service provider. Please check the format.",
-      );
+      setVerifyError(CLAIM_ERRORS.urlNoMatch);
       setVerifying(false);
       return;
     }
@@ -175,7 +181,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
       });
 
       if (result.status === ClaimStatus.VERIFIED) {
-        // Handle check — make sure the claim source matches the claimed handle
+        // Handle check - make sure the claim source matches the claimed handle
         const expectedHandle = serviceHandle
           .trim()
           .toLowerCase()
@@ -186,7 +192,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
 
         if (actualSubject && actualSubject !== expectedHandle) {
           setVerifyError(
-            `Handle mismatch: the claim belongs to "${result.identity?.subject}", but you entered "${serviceHandle.trim()}".`,
+            `${CLAIM_ERRORS.handleMismatch}: the claim belongs to "${result.identity?.subject}", but you entered "${serviceHandle.trim()}".`,
           );
           setVerifying(false);
           return;
@@ -232,13 +238,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
 
   // ── Render ────────────────────────────────────────────────────────
 
-  const stepTitle = {
-    "select-service": "Add claim — Select service",
-    "enter-handle": `Add claim — ${SERVICE_NAMES[service] ?? service}`,
-    "show-challenge": isDns ? "Add claim — Add DNS record" : "Add claim — Post challenge",
-    verify: "Add claim — Verify",
-    done: "Add claim — Verified ✓",
-  }[step];
+  const stepTitle = CLAIM_WIZARD.title(step, SERVICE_NAMES[service] ?? service, isDns);
 
   return (
     <WizardShell title={stepTitle} onCancel={onCancel}>
@@ -247,7 +247,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
         {step === "select-service" && (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted mb-2">
-              Choose the service you want to link to your AT Protocol identity.
+              {CLAIM_WIZARD.selectServiceDesc}
             </p>
             {SUPPORTED_SERVICES.map((svc) => (
               <button
@@ -269,8 +269,8 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted">
               {isDns
-                ? "Enter the domain you want to verify."
-                : `Enter your ${SERVICE_NAMES[service] ?? service} handle.`}
+                ? CLAIM_WIZARD.enterDomain
+                : CLAIM_WIZARD.enterHandle(SERVICE_NAMES[service] ?? service)}
             </p>
             <input
               type="text"
@@ -287,14 +287,14 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                 onClick={() => setStep("select-service")}
                 className="flex-1 py-2 text-xs border border-surface-border hover:border-muted transition-colors bg-transparent"
               >
-                Back
+                {NAV.back}
               </button>
               <button
                 onClick={handleHandleSubmit}
                 disabled={!serviceHandle.trim()}
                 className="flex-1 py-2 text-xs bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Next
+                {NAV.next}
               </button>
             </div>
           </div>
@@ -316,10 +316,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
             ) : (
               <>
                 <p className="text-xs text-muted">
-                  Post the following text publicly on{" "}
-                  <strong>{SERVICE_NAMES[service] ?? service}</strong> as{" "}
-                  <strong>{serviceHandle}</strong>, then paste the URL to that
-                  post below.
+                  {CLAIM_WIZARD.postInstruction(SERVICE_NAMES[service] ?? service, serviceHandle)}
                 </p>
 
                 {provider?.ui.instructions && (
@@ -349,12 +346,12 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                 {copied ? (
                   <>
                     <Check className="w-3 h-3" />
-                    Copied!
+                    {PROFILE.copied}
                   </>
                 ) : (
                   <>
                     <Copy className="w-3 h-3" />
-                    Copy
+                    {CLAIM_WIZARD.copy}
                   </>
                 )}
               </button>
@@ -362,7 +359,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
 
             {isDns && (
               <p className="text-xs text-muted">
-                DNS changes may take a few minutes to propagate.
+                {CLAIM_WIZARD.dnsPropagation}
               </p>
             )}
 
@@ -378,7 +375,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                 disabled={verifying}
                 className="flex-1 py-2 text-xs border border-surface-border hover:border-muted transition-colors bg-transparent disabled:opacity-50"
               >
-                Back
+                {NAV.back}
               </button>
               {isDns ? (
                 <button
@@ -389,10 +386,10 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                   {verifying ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Verifying…
+                      {CLAIMS.verifying}
                     </>
                   ) : (
-                    "Verify"
+                    CLAIMS.verify
                   )}
                 </button>
               ) : (
@@ -403,7 +400,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                   }}
                   className="flex-1 py-2 text-xs bg-accent text-white hover:bg-accent-hover transition-colors"
                 >
-                  I've posted it <ArrowRight className="w-3 h-3 inline" />
+                  {CLAIM_WIZARD.iPostedIt} <ArrowRight className="w-3 h-3 inline" />
                 </button>
               )}
             </div>
@@ -414,11 +411,11 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
         {step === "verify" && (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted">
-              Paste the URL of the post containing the proof text.
+              {CLAIM_WIZARD.pasteUrl}
             </p>
             <input
               type="url"
-              placeholder={provider?.ui.inputPlaceholder ?? "https://..."}
+              placeholder={provider?.ui.inputPlaceholder ?? CLAIM_WIZARD.urlPlaceholder}
               value={claimUrl}
               onChange={(e) => {
                 setClaimUrl(e.target.value);
@@ -441,7 +438,7 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                 disabled={verifying}
                 className="flex-1 py-2 text-xs border border-surface-border hover:border-muted transition-colors bg-transparent disabled:opacity-50"
               >
-                Back
+                {NAV.back}
               </button>
               <button
                 onClick={() => void handleVerify()}
@@ -451,10 +448,10 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
                 {verifying ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Verifying…
+                    {CLAIMS.verifying}
                   </>
                 ) : (
-                  "Verify"
+                  CLAIMS.verify
                 )}
               </button>
             </div>
@@ -465,31 +462,31 @@ export function AddClaimWizard({ did, onAdd, onCancel }: AddClaimWizardProps) {
         {step === "done" && verifySuccess && pendingClaim && (
           <div className="flex flex-col gap-3">
             <div className="text-xs bg-green-500/10 border border-green-500/30 text-green-400 p-3 font-semibold">
-              ✓ Claim verified successfully
+              ✓ {CLAIM_WIZARD.claimVerified}
             </div>
             <div className="text-xs text-muted space-y-1">
               <div>
-                <span className="text-white/60">Service:</span>{" "}
+                <span className="text-white/60">{CLAIM_WIZARD.service}</span>{" "}
                 {SERVICE_NAMES[service] ?? service}
               </div>
               <div>
-                <span className="text-white/60">Handle:</span>{" "}
+                <span className="text-white/60">{CLAIM_WIZARD.handle}</span>{" "}
                 {pendingClaim.record.identity.subject}
               </div>
               <div className="break-all">
-                <span className="text-white/60">Claim URI:</span>{" "}
+                <span className="text-white/60">{CLAIM_WIZARD.claimUri}</span>{" "}
                 {pendingClaim.record.claimUri}
               </div>
             </div>
             <p className="text-xs text-muted">
-              This proof will be saved to your repo when you click{" "}
-              <strong className="text-white/70">Save changes</strong>.
+              {CLAIM_WIZARD.saveNote.replace("Save changes", "")}
+              <strong className="text-white/70">{NAV.save.replace(" changes", "")}</strong>.
             </p>
             <button
               onClick={handleConfirm}
               className="w-full py-2 text-xs bg-accent text-white hover:bg-accent-hover transition-colors font-semibold"
             >
-              Add to list
+              {CLAIM_WIZARD.addToList}
             </button>
           </div>
         )}

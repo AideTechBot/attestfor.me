@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { AUTH_ERRORS, NAV } from "@/lib/ui-strings";
 
 export interface ErrorResponse {
   error: string;
@@ -6,17 +7,17 @@ export interface ErrorResponse {
   loginUrl?: string;
 }
 
-// Predefined auth error messages — only these codes are valid.
+// Predefined auth error messages - only these codes are valid.
 // Prevents user-injected error text in the URL.
 export const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  missing_handle: "Handle is required. Please enter your handle and try again.",
-  invalid_handle: "Invalid handle. Please check your handle and try again.",
-  login_failed: "Failed to initiate login. Please try again.",
-  access_denied: "User denied access to their account.",
-  network_error: "Network error. Please check your connection and try again.",
-  session_expired: "Authentication session expired. Please try again.",
-  invalid_response: "Invalid authentication response. Please try again.",
-  auth_failed: "Authentication failed. Please try again.",
+  missing_handle: AUTH_ERRORS.handleRequired,
+  invalid_handle: AUTH_ERRORS.invalidHandle,
+  login_failed: AUTH_ERRORS.initFailed,
+  access_denied: AUTH_ERRORS.accessDenied,
+  network_error: AUTH_ERRORS.networkError,
+  session_expired: AUTH_ERRORS.sessionExpired,
+  invalid_response: AUTH_ERRORS.invalidResponse,
+  auth_failed: AUTH_ERRORS.authFailed,
 };
 
 // Handle API errors
@@ -28,7 +29,7 @@ export async function handleApiError(response: Response): Promise<never> {
   } catch {
     errorData = {
       error: "unknown_error",
-      message: "An unexpected error occurred",
+      message: AUTH_ERRORS.unexpected,
     };
   }
 
@@ -63,7 +64,7 @@ export function showErrorToast(error: ErrorResponse) {
   if (code === "network_error") {
     toast.error(message, {
       action: {
-        label: "Retry",
+        label: NAV.retry,
         onClick: () => {
           window.location.reload();
         },
@@ -123,7 +124,7 @@ export async function fetchWithErrorHandling(
     if ((error as { message?: string })?.message === "Failed to fetch") {
       showErrorToast({
         error: "network_error",
-        message: "Network error. Please check your connection and try again.",
+        message: AUTH_ERRORS.networkError,
       });
     }
     throw error;

@@ -8,6 +8,7 @@ import { SERVICE_NAMES } from "@/lib/global-features";
 import { ServiceIcon } from "./ServiceIcon";
 import { useVerification } from "@/lib/verification-context";
 import { runVerification } from "@/lib/run-verification";
+import { DETAIL_LABELS, CLAIMS, VERIFY } from "@/lib/ui-strings";
 
 interface DetailedClaimCardProps {
   claim: AtProtoRecord<DevKeytraceClaim.Main>;
@@ -70,7 +71,7 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
 
   return (
     <div className="border border-surface-border overflow-hidden transition-shadow hover:shadow-md">
-      {/* Header row — click to collapse/expand body */}
+      {/* Header row - click to collapse/expand body */}
       <button
         onClick={() => setCollapsed((c) => !c)}
         aria-expanded={!collapsed}
@@ -97,22 +98,22 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
             <tbody>
               <tr className="border-b border-surface-border">
                 <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                  Status
+                  {DETAIL_LABELS.status}
                 </td>
                 <td className="px-3 py-2">
                   <span
                     className={`text-xs ${!isActive ? "text-red-400 font-semibold" : ""}`}
                   >
                     {value.retractedAt
-                      ? "retracted"
-                      : (value.status ?? "verified")}
+                      ? CLAIMS.retracted
+                      : (value.status ?? CLAIMS.verified)}
                   </span>
                 </td>
               </tr>
               {isActive && (
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                    Verification
+                    {DETAIL_LABELS.verification}
                   </td>
                   <td className="px-3 py-2">
                     <button
@@ -121,9 +122,9 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
                       title={
                         result
                           ? result.success
-                            ? "Passed — click to re-run"
-                            : "Failed — click to retry"
-                          : "Click to verify"
+                            ? VERIFY.passedRerun
+                            : VERIFY.failedRetry
+                          : VERIFY.clickToVerify
                       }
                       className={`text-xs font-semibold bg-transparent border-none p-0 cursor-pointer transition-colors disabled:cursor-not-allowed ${
                         status === "loading"
@@ -136,19 +137,19 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
                       }`}
                     >
                       {status === "loading"
-                        ? "verifying…"
+                        ? CLAIMS.verifying.toLowerCase().replace("...", "")
                         : status === "idle"
-                          ? "unknown"
+                          ? VERIFY.unknown
                           : result?.success
-                            ? "passed"
-                            : "failed"}
+                            ? VERIFY.passed
+                            : VERIFY.failed}
                     </button>
                   </td>
                 </tr>
               )}
               <tr className="border-b border-surface-border">
                 <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                  Subject
+                  {DETAIL_LABELS.subject}
                 </td>
                 <td className="px-3 py-2 font-medium">
                   {value.identity.subject}
@@ -157,7 +158,7 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
               {value.claimUri && (
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                    Claim URI
+                    {DETAIL_LABELS.claimUri}
                   </td>
                   <td className="px-3 py-2">
                     <a
@@ -177,7 +178,7 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
                 }
               >
                 <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                  Created
+                  {DETAIL_LABELS.created}
                 </td>
                 <td className="px-3 py-2 text-xs text-muted">
                   {formatDate(value.createdAt)}
@@ -186,7 +187,7 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
               {value.retractedAt && (
                 <tr>
                   <td className="px-3 py-2 text-xs font-medium text-muted align-top border-r border-surface-border">
-                    Retracted
+                    {DETAIL_LABELS.retractedAt}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted">
                     {formatDate(value.retractedAt)}
@@ -206,20 +207,20 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
               <tbody>
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
-                    Record URI
+                    {DETAIL_LABELS.recordUri}
                   </td>
                   <td className="px-3 py-2 font-mono break-all">{claim.uri}</td>
                 </tr>
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
-                    CID
+                    {DETAIL_LABELS.cid}
                   </td>
                   <td className="px-3 py-2 font-mono break-all">{claim.cid}</td>
                 </tr>
                 {value.nonce && (
                   <tr>
                     <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
-                      Nonce
+                      {DETAIL_LABELS.nonce}
                     </td>
                     <td className="px-3 py-2 font-mono">{value.nonce}</td>
                   </tr>
