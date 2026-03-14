@@ -37,7 +37,9 @@ import {
   CLAIMS,
   KEYS,
   EDIT_PROFILE,
+  META,
 } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 
 interface SessionData {
   authenticated: boolean;
@@ -57,6 +59,8 @@ function useSession() {
 export function EditProfilePage() {
   const { data: session, isLoading: sessionLoading } = useSession();
   const [activeTab, setActiveTab] = useState<"claims" | "keys">("claims");
+
+  useDocumentTitle(META.editProfileTitle);
 
   // Preload openpgp when this page is first visited so it's ready before the user needs it
   useEffect(() => {

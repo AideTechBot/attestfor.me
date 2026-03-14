@@ -1,8 +1,10 @@
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { SITE } from "@/lib/ui-strings";
+import { SITE, META } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 
 export function HomePage() {
+  useDocumentTitle(META.homeTitle);
   return (
     <>
       {/* Centered Logo and Tagline */}

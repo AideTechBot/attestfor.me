@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { MISC, NAV } from "@/lib/ui-strings";
+import { MISC, NAV, META } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 
 export function NotFoundContent() {
   return (
@@ -18,5 +19,7 @@ export function NotFoundContent() {
 }
 
 export function NotFoundPage() {
+  useDocumentTitle(META.notFoundTitle);
+
   return <NotFoundContent />;
 }

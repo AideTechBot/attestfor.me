@@ -1,6 +1,16 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProfile, resolveHandle } from "./bsky";
 import type { BskyProfile } from "./bsky";
+
+/**
+ * Update the document title when the component mounts or the title changes.
+ */
+export function useDocumentTitle(title: string) {
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+}
 
 /**
  * Fetch a profile via the Bluesky public API.

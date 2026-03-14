@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { FAQ } from "@/lib/ui-strings";
+import { FAQ, META } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 
 interface FaqItem {
   q: string;
@@ -171,6 +172,8 @@ const FAQS: FaqItem[] = [
 ];
 
 export function FaqPage() {
+  useDocumentTitle(META.faqTitle);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center shrink-0">

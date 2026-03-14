@@ -12,7 +12,8 @@ import type {
   DevKeytraceClaim,
   DevKeytraceUserPublicKey,
 } from "../../types/keytrace";
-import { NAV, PROFILE, PROFILE_EMPTY } from "@/lib/ui-strings";
+import { NAV, PROFILE, PROFILE_EMPTY, META } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 import { SUPPORTED_SERVICES } from "@/lib/run-verification";
 
 interface ProfileDetailsData {
@@ -81,6 +82,12 @@ export function ProfileDetailsPage() {
   const profile = useLoaderData() as ProfileDetailsData;
   const [activeTab, setActiveTab] = useState<"claims" | "keys">("claims");
   const [copiedDid, setCopiedDid] = useState(false);
+
+  useDocumentTitle(
+    profile.isValid
+      ? META.profileTitle(profile.displayName || profile.handle, profile.handle)
+      : META.notFoundTitle,
+  );
 
   if (!profile.isValid) {
     return <NotFoundContent />;

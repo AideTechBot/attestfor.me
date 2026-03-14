@@ -361,6 +361,11 @@ export const MISC = {
 // ============================================================================
 
 export const META = {
+  siteTitle: "ATtestfor.me",
+  homeTitle: "ATtestfor.me",
+  faqTitle: "FAQ | ATtestfor.me",
+  editProfileTitle: "Edit Profile | ATtestfor.me",
+  notFoundTitle: "Not Found | ATtestfor.me",
   profileTitle: (name: string, handle: string) =>
     `${name} (@${handle}) | ATtestfor.me`,
 } as const;

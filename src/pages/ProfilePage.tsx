@@ -17,7 +17,8 @@ import {
   useVerificationDispatch,
 } from "@/lib/verification-context";
 import { SUPPORTED_SERVICES, runVerification } from "@/lib/run-verification";
-import { PROFILE, PROFILE_EMPTY, NAV } from "@/lib/ui-strings";
+import { PROFILE, PROFILE_EMPTY, NAV, META } from "@/lib/ui-strings";
+import { useDocumentTitle } from "@/lib/hooks";
 
 interface ProfileData {
   handle: string;
@@ -103,6 +104,12 @@ export async function profileLoader({
 // ── Stub verification (remove when real verification is ready) ──
 export function ProfilePage() {
   const profile = useLoaderData() as ProfileData;
+
+  useDocumentTitle(
+    profile.isValid
+      ? META.profileTitle(profile.displayName || profile.handle, profile.handle)
+      : META.notFoundTitle,
+  );
 
   const activeClaims = profile.isValid
     ? profile.claims.filter(
