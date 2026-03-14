@@ -209,7 +209,16 @@ export function DetailedClaimCard({ claim }: DetailedClaimCardProps) {
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
                     {DETAIL_LABELS.recordUri}
                   </td>
-                  <td className="px-3 py-2 font-mono break-all">{claim.uri}</td>
+                  <td className="px-3 py-2 font-mono break-all">
+                    <a
+                      href={`https://pdsls.dev/${claim.uri}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:underline"
+                    >
+                      {claim.uri}
+                    </a>
+                  </td>
                 </tr>
                 <tr className="border-b border-surface-border">
                   <td className="px-3 py-2 font-medium text-muted align-top border-r border-surface-border">
